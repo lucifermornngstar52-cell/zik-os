@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'core/fs_service.dart';
 import 'core/settings.dart';
@@ -10,10 +9,6 @@ final DateTime bootAt = DateTime.now();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
   await FS.init();
   await Settings.load();
   runApp(const ZikOSApp());
