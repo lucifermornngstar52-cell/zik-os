@@ -74,10 +74,10 @@ class _DesktopAreaState extends State<_DesktopArea> {
                         ),
                 if (_menuOpen)
                   Positioned(
-                    left: 8,
+                    left: math.max(8.0, (area.width - 470) / 2),
                     bottom: kTaskbarHeight + 8,
-                    width: 380,
-                    height: 440,
+                    width: 470,
+                    height: 480,
                     child: StartMenu(onOpen: (app) {
                       setState(() => _menuOpen = false);
                       wm.open(app);

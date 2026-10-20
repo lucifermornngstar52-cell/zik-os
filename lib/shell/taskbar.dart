@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 
 import '../core/settings.dart';
@@ -14,62 +16,43 @@ class Taskbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surface.withOpacity(0.94),
-      elevation: 8,
-      child: SizedBox(
-        height: kTaskbarHeight,
-        child: Row(
-          children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: _StartButton(onPressed: onStart, active: menuOpen),
-            ),
-            Container(width: 1, height: 26, color: scheme.outlineVariant),
-            const SizedBox(width: 4),
-            for (final app in Apps.all)
-              IconButton(
-                tooltip: app.title,
-                icon: Icon(app.icon, size: 20),
-                onPressed: () => WindowManager.instance.open(app),
-              ),
-            const SizedBox(width: 4),
-            Container(width: 1, height: 26, color: scheme.outlineVariant),
-            const SizedBox(width: 4),
-            Expanded(
-              child: AnimatedBuilder(
-                animation: WindowManager.instance,
-                builder: (context, _) {
-                  final wm = WindowManager.instance;
-                  return ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: <Widget>[
-                      for (final w in wm.windows)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 7),
-                          child: _TaskButton(window: w),
-                        ),
-                    ],
-                  );
-                },
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Material(
+          color: scheme.surface.withOpacity(0.72),
+          child: Container(
+            height: kTaskbarHeight,
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: scheme.outlineVariant, width: 1),
               ),
             ),
-            const _Clock(),
-            AnimatedBuilder(
-              animation: Settings.instance,
-              builder: (context, _) {
-                return IconButton(
-                  tooltip: 'Тема',
-                  icon: Icon(Settings.instance.dark
-                      ? Icons.light_mode_outlined
-                      : Icons.dark_mode_outlined),
-                  onPressed: () =>
-                      Settings.instance.dark = !Settings.instance.dark,
-                );
-              },
+            child: Row(
+              children: <Widget>[
+                const Spacer(),
+                _StartButton(onPressed: onStart, active: menuOpen),
+                const SizedBox(width: 6),
+                for (final app in Apps.all) _TaskAppIcon(app: app),
+                const Spacer(),
+                const _Clock(),
+                AnimatedBuilder(
+                  animation: Settings.instance,
+                  builder: (context, _) {
+                    return IconButton(
+                      tooltip: 'Тема',
+                      icon: Icon(Settings.instance.dark
+                          ? Icons.light_mode_outlined
+                          : Icons.dark_mode_outlined),
+                      onPressed: () =>
+                          Settings.instance.dark = !Settings.instance.dark,
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+              ],
             ),
-            const SizedBox(width: 6),
-          ],
+          ),
         ),
       ),
     );
@@ -84,65 +67,94 @@ class _StartButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onPressed,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: active ? scheme.primary.withOpacity(0.8) : scheme.primary,
-        ),
-        child: Row(
-          children: <Widget>[
-            Icon(Icons.dashboard_rounded, size: 18, color: scheme.onPrimary),
-            const SizedBox(width: 6),
-            Text('Пуск',
-                style: TextStyle(
-                    color: scheme.onPrimary, fontWeight: FontWeight.w600, fontSize: 13)),
-          ],
+    return Tooltip(
+      message: 'Пуск',
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 44,
+          height: 40,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            color: active
+                ? scheme.primary.withOpacity(0.16)
+                : Colors.transparent,
+          ),
+          child: Icon(Icons.dashboard_rounded,
+              size: 20, color: scheme.onSurface),
         ),
       ),
     );
   }
 }
 
-class _TaskButton extends StatelessWidget {
-  const _TaskButton({required this.window});
-  final OSWindow window;
+class _TaskAppIcon extends StatelessWidget {
+  const _TaskAppIcon({required this.app});
+  final AppDefinition app;
 
   @override
   Widget build(BuildContext context) {
     final wm = WindowManager.instance;
     final scheme = Theme.of(context).colorScheme;
-    final focused = !window.minimized && window.z == wm.topZ;
-    return InkWell(
-      onTap: () {
-        if (window.minimized) {
-          wm.toggleMinimize(window);
-        } else if (focused) {
-          wm.toggleMinimize(window);
-        } else {
-          wm.focus(window);
-        }
+    return AnimatedBuilder(
+      animation: wm,
+      builder: (context, _) {
+        final w = wm.find(app.id);
+        final running = w != null;
+        final focused = running && !w!.minimized && w.z == wm.topZ;
+        return Tooltip(
+          message: app.title,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                InkWell(
+                  onTap: () {
+                    if (w == null) {
+                      wm.open(app);
+                    } else if (w.minimized) {
+                      wm.toggleMinimize(w);
+                    } else if (focused) {
+                      wm.toggleMinimize(w);
+                    } else {
+                      wm.focus(w);
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 42,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      color: focused
+                          ? scheme.primary.withOpacity(0.18)
+                          : Colors.transparent,
+                    ),
+                    child: Icon(
+                      app.icon,
+                      size: 20,
+                      color: running
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Container(
+                  width: running ? (focused ? 16.0 : 8.0) : 0.0,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(2),
+                    color: scheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
       },
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          color: focused ? scheme.primary.withOpacity(0.22) : scheme.surface,
-          border: Border.all(
-              color: focused ? scheme.primary : scheme.outlineVariant),
-        ),
-        child: Row(
-          children: <Widget>[
-            Icon(window.app.icon, size: 16, color: scheme.primary),
-            const SizedBox(width: 6),
-            Text(window.app.title, style: const TextStyle(fontSize: 12)),
-          ],
-        ),
-      ),
     );
   }
 }

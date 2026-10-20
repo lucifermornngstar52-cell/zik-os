@@ -13,7 +13,6 @@ Future<void> main() async {
   await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
-    DeviceOrientation.portraitUp,
   ]);
   await FS.init();
   await Settings.load();
