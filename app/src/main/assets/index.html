@@ -26,8 +26,8 @@ button { font-family:inherit; }
 
 #os { position:fixed; inset:0; display:none; background:linear-gradient(135deg,#0B1220,#1E293B 55%,#312E81); }
 #os::before { content:''; position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size:46px 46px; pointer-events:none; }
-#desk-icons { position:absolute; top:10px; left:10px; display:flex; flex-flow:column wrap; gap:10px; max-height:calc(100% - 70px); z-index:4; }
-.dicon { width:84px; text-align:center; border-radius:12px; padding:8px; cursor:pointer; }
+#desk-icons { position:absolute; inset:0; bottom:48px; z-index:4; pointer-events:none; }
+.dicon { position:absolute; width:84px; text-align:center; border-radius:12px; padding:8px; cursor:pointer; pointer-events:auto; touch-action:none; }
 .dicon:active { background:rgba(255,255,255,.12); }
 .dicon .ic { width:48px; height:48px; margin:0 auto; border-radius:12px; background:rgba(15,20,30,.55); display:flex; align-items:center; justify-content:center; }
 body.light .dicon .ic { background:rgba(255,255,255,.55); }
@@ -278,6 +278,7 @@ function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null
 function lsSet(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
 var settings = JSON.parse(lsGet('zikos_settings')||'null') || { wallpaper:0, accent:0, dark:true };
 function applySettings(){
+  if (settings.openMax===undefined) settings.openMax=true;
   document.body.classList.toggle('light', !settings.dark);
   document.documentElement.style.setProperty('--accent', ACCENTS[settings.accent]||ACCENTS[0]);
   $('#os').style.background = (WALLS[settings.wallpaper]||WALLS[0]).css;
@@ -350,6 +351,10 @@ function openApp(id, arg){
   layer().appendChild(el);
   wins[id] = {el:el, app:app, minimized:false, maximized:false, arg:arg||null, prev:null};
   app.render(el.querySelector('.wbody'), arg||null);
+  if (settings.openMax!==false) toggleMax(id);
+  var tbEl = el.querySelector('.tbar');
+  var lastTap=0;
+  tbEl.addEventListener('click', function(e){ if (e.target.closest('.wbtn')) return; var now=Date.now(); if (now-lastTap<380){ toggleMax(id); lastTap=0; } else lastTap=now; });
   var btns = el.querySelectorAll('.wbtn');
   for (var i=0;i<btns.length;i++)(function(b){
     b.addEventListener('click', function(e){ e.stopPropagation(); var a=b.getAttribute('data-a');
@@ -434,12 +439,38 @@ function buildTaskbar(){
 }
 function buildDeskIcons(){
   var c = $('#desk-icons'); c.innerHTML='';
-  for (var i=0;i<APPS.length;i++)(function(a){
+  var pos = {};
+  try { pos = JSON.parse(lsGet('zikos_icons')) || {}; } catch(e){ pos={}; }
+  var layerH = (window.innerHeight||720) - 118;
+  var perCol = Math.max(1, Math.floor(layerH/95));
+  for (var i=0;i<APPS.length;i++)(function(a, i){
     var d=document.createElement('div'); d.className='dicon';
     d.innerHTML='<div class="ic">'+a.icon+'</div><span>'+a.title+'</span>';
-    d.addEventListener('click', function(){ openApp(a.id); });
+    var p = (pos[a.id] && typeof pos[a.id].x==='number') ? pos[a.id] : { x: 10 + Math.floor(i/perCol)*94, y: 10 + (i%perCol)*95 };
+    d.style.left = p.x+'px'; d.style.top = p.y+'px';
+    var down=null, moved=false;
+    d.addEventListener('pointerdown', function(e){
+      down = {sx:e.clientX, sy:e.clientY, lx:p.x, ly:p.y}; moved=false;
+      try { d.setPointerCapture(e.pointerId); } catch(er){}
+      e.preventDefault();
+    });
+    d.addEventListener('pointermove', function(e){
+      if (!down) return;
+      if (Math.abs(e.clientX-down.sx)>7 || Math.abs(e.clientY-down.sy)>7) moved=true;
+      if (!moved) return;
+      p.x = clampN(down.lx + (e.clientX-down.sx), 0, window.innerWidth-92);
+      p.y = clampN(down.ly + (e.clientY-down.sy), 0, window.innerHeight-150);
+      d.style.left = p.x+'px'; d.style.top = p.y+'px';
+    });
+    d.addEventListener('pointerup', function(){
+      if (down && moved){
+        pos[a.id] = {x:p.x, y:p.y};
+        lsSet('zikos_icons', JSON.stringify(pos));
+      } else if (down){ openApp(a.id); }
+      down=null;
+    });
     c.appendChild(d);
-  })(APPS[i]);
+  })(APPS[i], i);
 }
 var menuOpen=false;
 function toggleMenu(){ menuOpen=!menuOpen; if(menuOpen) renderMenu(); $('#menu').classList.toggle('hidden', !menuOpen); }
@@ -557,8 +588,8 @@ function hl(src, lang){
 function renderTerminal(root){
   root.innerHTML='<div class="term"><div class="t-out"></div><div class="t-in"><span class="t-ps"></span><input class="t-i" spellcheck="false" autocomplete="off" autocapitalize="off"></div></div>';
   var out=root.querySelector('.t-out'), ps=root.querySelector('.t-ps'), inp=root.querySelector('.t-i');
-  var cwd='';
-  function setPs(){ ps.textContent='zik@zikos:'+(cwd||'~')+'$ '; }
+  var cwd='', cmdMode=false;
+  function setPs(){ if (cmdMode){ ps.textContent='C:\\ZikOS'+(cwd?'\\'+cwd.replace(/\//g,'\\'):'')+'>'; } else { ps.textContent='zik@zikos:'+(cwd||'~')+'$ '; } }
   setPs();
   out.textContent='ZikOS Terminal 1.0.0 — введите help для списка команд.\n\n';
   root.querySelector('.term').addEventListener('click', function(){ inp.focus(); });
@@ -582,8 +613,13 @@ function renderTerminal(root){
     var parts = raw.trim().split(/\s+/), cmd = parts[0], args = parts.slice(1);
     if (!cmd){ scrollBottom(); return; }
     switch(cmd){
+      case 'cmd':
+        cmdMode=true; setPs();
+        out.textContent+='Microsoft Windows [Версия 10.0.1027]\n(c) Корпорация Майкрософт. ZikOS Edition.\n\n'; break;
+      case 'exit':
+        if (cmdMode){ cmdMode=false; setPs(); } else out.textContent+='Закройте окно крестиком.\n'; break;
       case 'help':
-        out.textContent+='Доступные команды:\n  ls, cd, pwd, cat, mkdir, touch, rm, tree — файлы\n  echo, clear, date, whoami, uname, neofetch, uptime\n  open <files|terminal|code|converter|notes|grok|mypc|browser|settings>\n'; break;
+        out.textContent+='Доступные команды:\n  ls, cd, pwd, cat, mkdir, touch, rm, tree — файлы\n  echo, clear, date, whoami, uname, neofetch, uptime\n  open <files|terminal|code|converter|notes|grok|mypc|browser|settings>\n  cmd — режим командной строки как на ПК, exit — вернуться\n'; break;
       case 'ls': {
         var t = args.length ? abs(args[0]) : cwd;
         if (fs[t] && fs[t].t==='f') out.textContent += (args[0]||t)+'\n';
@@ -1046,7 +1082,7 @@ function renderGrok(root){
     if (!GROQ_KEY){ st.msgs.push({role:'err', content:'Ключ не найден в этой сборке. Соберите APK с секретом GROQ_API_KEY или проверьте сборку.'}); drawAll(); return; }
     ta.value='';
     st.msgs.push({role:'user', content:t});
-    var hist = st.msgs.slice(-12).map(function(m){ return {role:(m.role==='err'?'assistant':m.role), content:m.content}; });
+    var hist = st.msgs.slice(-12).map(function(m){ return {role:(m.role==='user'?'user':'assistant'), content:m.content}; });
     st.msgs.push({role:'bot', content:'...думает...'});
     var thinkIdx = st.msgs.length-1;
     drawAll(); st.busy = true; stat.textContent = 'запрос...';
