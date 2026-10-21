@@ -300,6 +300,8 @@ function lsSet(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
 var settings = JSON.parse(lsGet('zikos_settings')||'null') || { wallpaper:0, accent:0, dark:true };
 function applySettings(){
   if (settings.openMax===undefined) settings.openMax=true;
+  if (settings.fs===undefined) settings.fs=true;
+  try { if (window.zikBridge && zikBridge.setFullscreen) zikBridge.setFullscreen(settings.fs!==false); } catch(e){}
   document.body.classList.toggle('light', !settings.dark);
   document.documentElement.style.setProperty('--accent', ACCENTS[settings.accent]||ACCENTS[0]);
   $('#os').style.background = (WALLS[settings.wallpaper]||WALLS[0]).css;
@@ -686,6 +688,11 @@ function renderTerminal(root){
         if (fs[iap] && fs[iap].t==='f' && /\.html?$/i.test(iap)){ installApp(iap); }
         else out.textContent+='install: html-файл не найден: '+args[0]+'\n';
         break; }
+      case 'fullscreen':
+        settings.fs = !(settings.fs!==false);
+        saveSettings(); applySettings();
+        out.textContent += (settings.fs? 'Полноэкранный режим включён':'Полноэкранный режим выключен')+'\n';
+        break;
       case 'help':
         out.textContent+='Доступные команды:\n  ls, cd, pwd, cat, mkdir, touch, rm, tree — файлы\n  echo, clear, date, whoami, uname, neofetch, uptime\n  open <files|terminal|code|converter|notes|grok|mypc|browser|settings>\n  cmd — режим командной строки как на ПК, exit — вернуться\n  grep <слово> [папка] — поиск по файлам, edit <файл> — открыть в редакторе\n  install <файл.html> — установить как приложение с ярлыком\n  run <файл.html> — запустить приложение в окне\n'; break;
       case 'ls': {
@@ -1765,6 +1772,11 @@ function initDeskCtx(){
   addItem('Упорядочить значки', function(){ lsSet('zikos_icons','{}'); buildDeskIcons(); toast('Значки упорядочены'); });
   addItem('Установить приложение...', importDeviceApp);
   addItem('Персонализация', function(){ openApp('settings'); });
+  addItem(settings.fs!==false ? 'Выключить полноэкранный' : 'Полноэкранный режим', function(){
+    settings.fs = !(settings.fs!==false);
+    saveSettings(); applySettings();
+    toast(settings.fs ? 'Полноэкранный режим включён' : 'Системная панель вернулась');
+  });
   addItem('Открыть терминал', function(){ openApp('terminal'); });
   function show(x, y){
     menu.style.display='block';
