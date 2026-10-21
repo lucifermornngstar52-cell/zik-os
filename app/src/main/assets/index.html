@@ -466,37 +466,41 @@ function buildDeskIcons(){
   try { pos = JSON.parse(lsGet('zikos_icons')) || {}; } catch(e){ pos={}; }
   var layerH = (window.innerHeight||720) - 118;
   var perCol = Math.max(1, Math.floor(layerH/95));
-  for (var i=0;i<APPS.length;i++)(function(a, i){
-    if (a.hidden) return;
+  function makeIcon(key, label, iconSvg, onClick, onHold){
     var d=document.createElement('div'); d.className='dicon';
-    d.innerHTML='<div class="ic">'+a.icon+'</div><span>'+a.title+'</span>';
-    var p = (pos[a.id] && typeof pos[a.id].x==='number') ? pos[a.id] : { x: 10 + Math.floor(i/perCol)*94, y: 10 + (i%perCol)*95 };
-    d.style.left = p.x+'px'; d.style.top = p.y+'px';
-    var down=null, moved=false;
+    d.innerHTML='<div class="ic">'+iconSvg+'</div><span>'+label+'</span>';
+    var p=(pos[key] && typeof pos[key].x==='number') ? pos[key] : null;
+    if (!p){ var idx=c.children.length; p={x:10+Math.floor(idx/perCol)*94, y:10+(idx%perCol)*95}; }
+    d.style.left=p.x+'px'; d.style.top=p.y+'px';
+    var down=null, moved=false, hold=null, held=false;
     d.addEventListener('pointerdown', function(e){
-      down = {sx:e.clientX, sy:e.clientY, lx:p.x, ly:p.y}; moved=false;
+      down={sx:e.clientX, sy:e.clientY, lx:p.x, ly:p.y}; moved=false; held=false;
+      if (onHold) hold=setTimeout(function(){ hold=null; held=true; onHold(); }, 600);
       try { d.setPointerCapture(e.pointerId); } catch(er){}
       e.preventDefault();
     });
     d.addEventListener('pointermove', function(e){
       if (!down) return;
-      if (Math.abs(e.clientX-down.sx)>7 || Math.abs(e.clientY-down.sy)>7) moved=true;
-      if (!moved) return;
-      p.x = clampN(down.lx + (e.clientX-down.sx), 0, window.innerWidth-92);
-      p.y = clampN(down.ly + (e.clientY-down.sy), 0, window.innerHeight-150);
-      d.style.left = p.x+'px'; d.style.top = p.y+'px';
+      if (Math.abs(e.clientX-down.sx)>7 || Math.abs(e.clientY-down.sy)>7){ moved=true; if(hold){clearTimeout(hold); hold=null;} }
+      if (!moved || held) return;
+      p.x=clampN(down.lx+(e.clientX-down.sx), 0, window.innerWidth-92);
+      p.y=clampN(down.ly+(e.clientY-down.sy), 0, window.innerHeight-150);
+      d.style.left=p.x+'px'; d.style.top=p.y+'px';
     });
     d.addEventListener('pointerup', function(){
-      if (down && moved){
-        pos[a.id] = {x:p.x, y:p.y};
-        lsSet('zikos_icons', JSON.stringify(pos));
-      } else if (down){ openApp(a.id); }
+      if (hold){ clearTimeout(hold); hold=null; }
+      if (down && moved){ pos[key]={x:p.x,y:p.y}; lsSet('zikos_icons', JSON.stringify(pos)); }
+      else if (down && !moved && !held){ onClick(); }
       down=null;
     });
     c.appendChild(d);
-  })(APPS[i], i);
-}
-var menuOpen=false;
+  }
+  APPS.forEach(function(a){ if (!a.hidden) makeIcon(a.id, a.title, a.icon, function(){ openApp(a.id); }, null); });
+  installedApps().forEach(function(a){
+    makeIcon('user:'+a.path, esc(a.name), IC.apps, function(){ openApp('runapp', a.path); },
+      function(){ confirmDlg('Удалить ярлык «'+a.name+'»?').then(function(ok){ if(ok){ uninstallApp(a.path); toast('Ярлык удалён'); } }); });
+  });
+}var menuOpen=false;
 function toggleMenu(){ menuOpen=!menuOpen; if(menuOpen) renderMenu(); $('#menu').classList.toggle('hidden', !menuOpen); }
 function renderMenu(){
   var m = $('#menu');
@@ -508,6 +512,13 @@ function renderMenu(){
   function draw(q){
     grid.innerHTML='';
     var found=0;
+    installedApps().forEach(function(a){
+      if (q && a.name.toLowerCase().indexOf(q)<0) return;
+      var t2=document.createElement('div'); t2.className='tile';
+      t2.innerHTML='<div class="ic">'+IC.apps+'</div>'+esc(a.name);
+      t2.addEventListener('click', function(){ openApp('runapp', a.path); toggleMenu(); });
+      grid.appendChild(t2);
+    });
     for (var i=0;i<APPS.length;i++)(function(a){
       if (a.hidden) return;
       if (a.title.toLowerCase().indexOf(q)<0) return;
@@ -669,8 +680,14 @@ function renderTerminal(root){
         if (fs[rp] && fs[rp].t==='f' && /\.html?$/i.test(rp)) openApp('runapp', rp);
         else out.textContent+='run: html-файл не найден: '+args[0]+'\n';
         break; }
+      case 'install': {
+        if (!args.length){ out.textContent+='install: укажите html-файл\n'; break; }
+        var iap=abs(args[0]);
+        if (fs[iap] && fs[iap].t==='f' && /\.html?$/i.test(iap)){ installApp(iap); }
+        else out.textContent+='install: html-файл не найден: '+args[0]+'\n';
+        break; }
       case 'help':
-        out.textContent+='Доступные команды:\n  ls, cd, pwd, cat, mkdir, touch, rm, tree — файлы\n  echo, clear, date, whoami, uname, neofetch, uptime\n  open <files|terminal|code|converter|notes|grok|mypc|browser|settings>\n  cmd — режим командной строки как на ПК, exit — вернуться\n  grep <слово> [папка] — поиск по файлам, edit <файл> — открыть в редакторе\n  run <файл.html> — запустить приложение в окне\n'; break;
+        out.textContent+='Доступные команды:\n  ls, cd, pwd, cat, mkdir, touch, rm, tree — файлы\n  echo, clear, date, whoami, uname, neofetch, uptime\n  open <files|terminal|code|converter|notes|grok|mypc|browser|settings>\n  cmd — режим командной строки как на ПК, exit — вернуться\n  grep <слово> [папка] — поиск по файлам, edit <файл> — открыть в редакторе\n  install <файл.html> — установить как приложение с ярлыком\n  run <файл.html> — запустить приложение в окне\n'; break;
       case 'ls': {
         var t = args.length ? abs(args[0]) : cwd;
         if (fs[t] && fs[t].t==='f') out.textContent += (args[0]||t)+'\n';
@@ -1540,6 +1557,8 @@ function renderAppsHub(root){
   function draw(){
     var list = appList();
     var html = '<div style="flex:1;overflow-y:auto;padding:16px">';
+    var inst = installedApps();
+    html += '<div style="margin-bottom:12px"><button class="chip" id="hub-import">&#11014; Установить с планшета</button></div>';
     if (BUILD_STATE.status==='upload') html += '<div class="hub-card" style="margin-bottom:12px">&#11014; Загружаю «'+esc(BUILD_STATE.name)+'» в облако...</div>';
     else if (BUILD_STATE.status==='building') html += '<div class="hub-card" style="margin-bottom:12px">&#9881; Собираю «'+esc(BUILD_STATE.name)+'»: APK и EXE. Займёт 5-8 минут, окно можно закрыть — сборка в облаке.</div>';
     else if (BUILD_STATE.status==='done') {
@@ -1548,21 +1567,32 @@ function renderAppsHub(root){
       html += '</div><div style="font-size:11px;color:var(--muted);margin-top:6px">Файл скачается во внешнем браузере</div></div>';
     }
     else if (BUILD_STATE.status==='failed') html += '<div class="hub-card" style="margin-bottom:12px">&#10060; Сборка не удалась — попробуй ещё раз</div>';
-    if (!list.length && BUILD_STATE.status==='idle') html += '<div style="color:var(--muted);text-align:center;padding:40px">Пока нет приложений. Создай проект в редакторе (кнопка «Проект») или сгенерируй по описанию (&#10024;).</div>';
+    if (!list.length && BUILD_STATE.status==='idle') html += '<div style="color:var(--muted);text-align:center;padding:20px">Пока нет приложений. Создай проект в редакторе (кнопка «Проект»), сгенерируй по описанию (&#10024;) или установи с планшета.</div>';
     html += '<div class="hub-grid">';
     list.forEach(function(p){
+      var isIn = inst.some(function(x){ return x.path===p; });
       html += '<div class="hub-card"><div class="hub-name">'+esc(p.split('/').pop())+'</div><div class="hub-path">'+esc(p)+'</div>'
         +'<div class="hub-btns"><button class="chip" data-run="'+esc(p)+'">Запустить</button>'
         +'<button class="chip" data-edit="'+esc(p)+'">Код</button>'
         +'<button class="chip" data-exp="'+esc(p)+'">&#11015;</button>'
-        +'<button class="chip" data-bld="'+esc(p)+'">&#128230; Собрать</button></div></div>';
+        +'<button class="chip" data-bld="'+esc(p)+'">&#128230; Собрать</button>'
+        +'<button class="chip" data-ins="'+esc(p)+'">'+(isIn?'Убрать ярлык':'На рабочий стол')+'</button></div></div>';
     });
     html += '</div></div>';
     root.innerHTML = html;
+    root.querySelector('#hub-import').onclick = importDeviceApp;
     root.querySelectorAll('[data-run]').forEach(function(b){ b.onclick=function(){ openApp('runapp', b.getAttribute('data-run')); }; });
     root.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ openApp('code', b.getAttribute('data-edit')); }; });
     root.querySelectorAll('[data-bld]').forEach(function(b){ b.onclick=function(){ startBuild(b.getAttribute('data-bld')); }; });
     root.querySelectorAll('[data-dl]').forEach(function(b){ b.onclick=function(){ var u=b.getAttribute('data-dl'); if (window.zikBridge && zikBridge.openUrl) zikBridge.openUrl(u); else window.open(u,'_blank'); }; });
+    root.querySelectorAll('[data-ins]').forEach(function(b){
+      b.onclick=function(){
+        var p2=b.getAttribute('data-ins');
+        if (installedApps().some(function(x){ return x.path===p2; })){ uninstallApp(p2); toast('Ярлык убран'); }
+        else { installApp(p2); }
+        draw();
+      };
+    });
     root.querySelectorAll('[data-exp]').forEach(function(b){
       b.onclick=function(){
         var p=b.getAttribute('data-exp');
@@ -1573,8 +1603,7 @@ function renderAppsHub(root){
     });
   }
   draw();
-}
-var BUILD_STATE = { status:'idle', name:'', links:[], started:0 };
+}var BUILD_STATE = { status:'idle', name:'', links:[], started:0 };
 var GH_T = null;
 function ghInit(cb){
   if (GH_T !== null) return cb();
@@ -1674,6 +1703,96 @@ function initMsgListener(){
     lg.scrollTop = lg.scrollHeight;
   });
 }
+// ---------- установленные приложения ----------
+function installedApps(){ try { return JSON.parse(lsGet('zikos_installed')) || []; } catch(e){ return []; } }
+function installApp(path, name){
+  var apps = installedApps();
+  if (apps.some(function(a){ return a.path===path; })){ toast('Уже установлено'); return; }
+  apps.push({path: path, name: name || path.split('/').pop().replace(/\.html?$/i,'')});
+  lsSet('zikos_installed', JSON.stringify(apps));
+  buildDeskIcons();
+  toast('Установлено: '+ (name||'приложение'));
+}
+function uninstallApp(path){
+  var apps = installedApps().filter(function(a){ return a.path!==path; });
+  lsSet('zikos_installed', JSON.stringify(apps));
+  buildDeskIcons();
+}
+function importDeviceApp(){
+  if (window.zikBridge && zikBridge.importFile){
+    zikBridge.importFile();
+    toast('Выбери html-файл на планшете');
+    var tries=0;
+    var tm=setInterval(function(){
+      tries++;
+      var got=null;
+      try { got=zikBridge.getPicked(); } catch(e){}
+      if (got){
+        clearInterval(tm);
+        if (got==='__cancel__') return;
+        if (got==='__error__'){ toast('Не удалось прочитать файл'); return; }
+        askText('Название приложения', '').then(function(nm){
+          if (!nm || !nm.trim()){ nm='app-'+(Date.now()%100000); } else { nm=nm.trim(); }
+          fsMkdir('apps');
+          fsWrite('apps/'+nm+'.html', got);
+          installApp('apps/'+nm+'.html', nm);
+        });
+      } else if (tries>60){ clearInterval(tm); }
+    }, 500);
+  } else {
+    var fi=document.createElement('input'); fi.type='file'; fi.accept='.html,.htm';
+    fi.onchange=function(){
+      var f=fi.files[0]; if(!f)return;
+      var rd=new FileReader();
+      rd.onload=function(){ fsMkdir('apps'); var p='apps/'+f.name; fsWrite(p, rd.result); installApp(p, f.name.replace(/\.html?$/i,'')); };
+      rd.readAsText(f);
+    };
+    fi.click();
+  }
+}
+function initDeskCtx(){
+  var menu=document.createElement('div'); menu.id='desk-ctx';
+  menu.style.cssText='position:fixed;z-index:900;background:var(--surface2);border:1px solid var(--outline);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);padding:5px;min-width:210px;display:none;';
+  document.body.appendChild(menu);
+  function addItem(label, fn){
+    var b=document.createElement('button');
+    b.style.cssText='display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);font:inherit;font-size:13px;padding:9px 12px;border-radius:7px;cursor:pointer;';
+    b.textContent=label;
+    b.onclick=function(){ menu.style.display='none'; fn(); };
+    menu.appendChild(b);
+  }
+  addItem('Обновить', function(){ buildDeskIcons(); });
+  addItem('Упорядочить значки', function(){ lsSet('zikos_icons','{}'); buildDeskIcons(); toast('Значки упорядочены'); });
+  addItem('Установить приложение...', importDeviceApp);
+  addItem('Персонализация', function(){ openApp('settings'); });
+  addItem('Открыть терминал', function(){ openApp('terminal'); });
+  function show(x, y){
+    menu.style.display='block';
+    var mx=Math.min(x||200, window.innerWidth-230);
+    var my=Math.min(y||200, window.innerHeight-250);
+    menu.style.left=Math.max(4,mx)+'px'; menu.style.top=Math.max(4,my)+'px';
+  }
+  function onDesk(t){
+    return t===document.body || (t.id==='os') || (t.id==='windows') || (t.id==='desk-icons') || (t.id==='wall');
+  }
+  document.addEventListener('contextmenu', function(e){
+    if (e.target.closest && e.target.closest('input, textarea, select, iframe, .win, .dicon, #taskbar, #menu, .dlg, #shutdown, #boot, #desk-ctx')) return;
+    if (!onDesk(e.target)) return;
+    e.preventDefault();
+    show(e.clientX, e.clientY);
+  });
+  var lp=null;
+  document.addEventListener('pointerdown', function(e){
+    if (!onDesk(e.target)) return;
+    var x=e.clientX, y=e.clientY;
+    lp=setTimeout(function(){ lp=null; show(x, y); }, 550);
+  });
+  document.addEventListener('pointermove', function(){ if (lp){ clearTimeout(lp); lp=null; } });
+  document.addEventListener('pointerup', function(){ if (lp){ clearTimeout(lp); lp=null; } });
+  document.addEventListener('pointerdown', function(e){ if (!e.target.closest('#desk-ctx')) menu.style.display='none'; }, true);
+}
+initDeskCtx();
+
 // ---------- загрузка ----------
 var BOOT_LINES = [
   'ZIK BIOS v2.41 — W1027 Tablet PC',
