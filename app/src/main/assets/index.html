@@ -524,7 +524,40 @@ function buildDeskIcons(){
   }
   APPS.forEach(function(a){ if (!a.hidden) makeIcon(a.id, a.title, a.icon, function(){ openApp(a.id); }); });
   installedApps().forEach(function(a){ makeIcon('user:'+a.path, esc(a.name), IC.apps, function(){ openApp('runapp', a.path); }); });
-}function tick(){
+}function toggleMenu(){ menuOpen=!menuOpen; if(menuOpen) renderMenu(); $('#menu').classList.toggle('hidden', !menuOpen); }
+function renderMenu(){
+  var m = $('#menu');
+  m.innerHTML = '<div class="search">'+IC.search+'<input id="menu-q" placeholder="Поиск приложений"></div>'
+   +'<div class="label">Закреплено</div><div class="grid" id="menu-grid"></div>'
+   +'<footer><div class="ava">z</div><div class="who">zik<small>zik@zikos · HikariOS 2.0</small></div>'
+   +'<button class="tb-btn" id="pwr" title="Выключение">'+IC.power+'</button></footer>';
+  var grid = m.querySelector('#menu-grid');
+  function draw(q){
+    grid.innerHTML='';
+    var found=0;
+    installedApps().forEach(function(a){
+      if (q && a.name.toLowerCase().indexOf(q)<0) return;
+      var t2=document.createElement('div'); t2.className='tile';
+      t2.innerHTML='<div class="ic">'+IC.apps+'</div>'+esc(a.name);
+      t2.addEventListener('click', function(){ openApp('runapp', a.path); toggleMenu(); });
+      grid.appendChild(t2);
+    });
+    for (var i=0;i<APPS.length;i++)(function(a){
+      if (a.hidden) return;
+      if (a.title.toLowerCase().indexOf(q)<0) return;
+      found++;
+      var t=document.createElement('div'); t.className='tile';
+      t.innerHTML='<div class="ic">'+a.icon+'</div>'+a.title;
+      t.addEventListener('click', function(){ openApp(a.id); toggleMenu(); });
+      grid.appendChild(t);
+    })(APPS[i]);
+    if(!found) grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px 0">Ничего не найдено</div>';
+  }
+  draw('');
+  m.querySelector('#menu-q').addEventListener('input', function(e){ draw(e.target.value.toLowerCase()); });
+  m.querySelector('#pwr').addEventListener('click', function(){ $('#shutdown').classList.remove('hidden'); });
+}
+function tick(){
   var d=new Date();
   var wd=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][ (d.getDay()+6)%7 ];
   function p2(n){ return (n<10?'0':'')+n; }
