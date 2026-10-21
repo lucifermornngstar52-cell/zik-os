@@ -982,10 +982,13 @@ var GROQ_DEF = 'openai/gpt-oss-120b';
 var GROQ_MODELS = ['openai/gpt-oss-120b','openai/gpt-oss-20b','qwen/qwen3.8-27b'];
 function groqInit(cb){
   if (GROQ_KEY !== null) return cb();
-  fetch('grok.json').then(function(r){ return r.json(); }).then(function(j){
-    GROQ_KEY = (j && j.key) ? j.key : '';
-    cb();
-  }).catch(function(){ GROQ_KEY=''; cb(); });
+  try {
+    var x = new XMLHttpRequest();
+    x.open('GET', 'grok.json', true);
+    x.onload = function(){ var j={}; try { j=JSON.parse(x.responseText); } catch(e){} GROQ_KEY=(j && j.key)? j.key : ''; cb(); };
+    x.onerror = function(){ GROQ_KEY=''; cb(); };
+    x.send();
+  } catch(e){ GROQ_KEY=''; cb(); }
 }
 function renderGrok(root){
   var st = root._grokState || (root._grokState = {msgs:null, busy:false});
