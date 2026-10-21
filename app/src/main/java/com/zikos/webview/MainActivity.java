@@ -3,6 +3,11 @@ package com.zikos.webview;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.content.Intent;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothServerSocket;
+import android.bluetooth.BluetoothSocket;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import android.content.IntentFilter;
 import android.os.BatteryManager;
 import android.os.Build;
@@ -36,6 +41,106 @@ public class MainActivity extends Activity {
 
     private String pickedContent = null;
     private boolean fsMode = true;
+    private WebView webView = null;
+    private volatile boolean btInputOn = false;
+    private BluetoothServerSocket btServer = null;
+    private static final String BT_UUID = "7d1a4f2e-8c9b-4e5a-9f30-6b1c2d3e4f50";
+
+    private void js(final String code) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() { if (webView != null) webView.evaluateJavascript(code, null); }
+        });
+    }
+
+    private void stopBtInput() {
+        try { if (btServer != null) btServer.close(); } catch (Exception e) {}
+        btServer = null;
+        js("window.__remoteIn&&window.__remoteIn({t:'st',s:'off'})");
+    }
+
+    private void startBtInput() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    final BluetoothAdapter ad = BluetoothAdapter.getDefaultAdapter();
+                    if (ad == null || !ad.isEnabled()) { js("window.__remoteIn&&window.__remoteIn({t:'st',s:'nobt'})"); return; }
+                    btServer = ad.listenUsingRfcommWithServiceRecord("Hikari Input", java.util.UUID.fromString(BT_UUID));
+                    while (btInputOn) {
+                        BluetoothSocket s = btServer.accept();
+                        if (!btInputOn) { try { s.close(); } catch (Exception e) {} break; }
+                        serveBt(s);
+                    }
+                } catch (Exception e) {
+                    if (btInputOn) js("window.__remoteIn&&window.__remoteIn({t:'st',s:'err'})");
+                }
+            }
+        }).start();
+    }
+
+    private void serveBt(BluetoothSocket s) {
+        String nm = "";
+        try { nm = String.valueOf(s.getRemoteDevice().getName()).replace("'", "").replace(""", ""); } catch (Exception e) {}
+        js("window.__remoteIn&&window.__remoteIn({t:'st',s:'on',n:'" + nm + "'})");
+        try {
+            BufferedReader r = new BufferedReader(new InputStreamReader(s.getInputStream(), "UTF-8"));
+            String line;
+            while (btInputOn && (line = r.readLine()) != null) {
+                String msg = btParse(line);
+                if (msg != null) js("window.__remoteIn&&window.__remoteIn(" + msg + ")");
+            }
+        } catch (Exception e) {}
+        try { s.close(); } catch (Exception e) {}
+        js("window.__remoteIn&&window.__remoteIn({t:'st',s:'lost'})");
+    }
+
+    private String btParse(String line) {
+        try {
+            if (line.startsWith("k:")) {
+                JSONObject o = new JSONObject();
+                o.put("t", "k");
+                o.put("c", line.substring(2));
+                return o.toString();
+            }
+            if (line.equals("kB") || line.equals("kE") || line.equals("kL") || line.equals("kR") || line.equals("kU") || line.equals("kD") || line.equals("kT")) {
+                JSONObject o = new JSONObject();
+                o.put("t", "e");
+                String k = "back";
+                if (line.equals("kE")) k = "enter";
+                else if (line.equals("kL")) k = "left";
+                else if (line.equals("kR")) k = "right";
+                else if (line.equals("kU")) k = "up";
+                else if (line.equals("kD")) k = "down";
+                else if (line.equals("kT")) k = "tab";
+                o.put("k", k);
+                return o.toString();
+            }
+            if (line.startsWith("m:")) {
+                String[] p = line.split(":");
+                if (p.length >= 3) {
+                    JSONObject o = new JSONObject();
+                    o.put("t", "m");
+                    o.put("dx", Long.parseLong(p[1].trim()));
+                    o.put("dy", Long.parseLong(p[2].trim()));
+                    return o.toString();
+                }
+            }
+            if (line.equals("c:1") || line.equals("c:2")) {
+                JSONObject o = new JSONObject();
+                o.put("t", "c");
+                o.put("b", line.endsWith("1") ? 1 : 2);
+                return o.toString();
+            }
+            if (line.startsWith("s:")) {
+                JSONObject o = new JSONObject();
+                o.put("t", "s");
+                o.put("d", Long.parseLong(line.substring(2).trim()));
+                return o.toString();
+            }
+        } catch (Exception e) {}
+        return null;
+    }
 
     private void hideSystemUI() {
         View decor = getWindow().getDecorView();
@@ -80,7 +185,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        WebView webView = new WebView(this);
+        webView = new WebView(this);
         webView.getSettings().setJavaScriptEnabled(true);
         webView.getSettings().setDomStorageEnabled(true);
         webView.getSettings().setAllowFileAccess(true);
@@ -279,6 +384,12 @@ public class MainActivity extends Activity {
             } catch (Exception e) {
                 return "err";
             }
+        }
+
+        @JavascriptInterface
+        public void setBtInput(final boolean on) {
+            btInputOn = on;
+            if (on) startBtInput(); else stopBtInput();
         }
 
         @JavascriptInterface

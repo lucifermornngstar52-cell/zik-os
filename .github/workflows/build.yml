@@ -23,3 +23,7 @@ jobs:
         with:
           name: zikos-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hikari-remote-apk
+          path: remote/build/outputs/apk/debug/remote-debug.apk

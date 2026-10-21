@@ -175,6 +175,7 @@ textarea.ta { width:100%; min-height:84px; background:var(--card); color:var(--t
 
 #shutdown { position:fixed; inset:0; background:#000; z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:#556; }
 #shutdown .zlogo { width:44px; height:44px; border-radius:11px; background:#1a2230; display:flex; align-items:center; justify-content:center; color:#667; font-weight:700; font-size:24px; }
+#rcur { position:fixed; z-index:99999; pointer-events:none; display:none; filter:drop-shadow(0 1px 3px rgba(0,0,0,.7)); }
 #toast { position:fixed; left:50%; bottom:64px; transform:translateX(-50%); background:#1B2431; color:#fff; border:1px solid var(--outline); padding:9px 16px; border-radius:18px; font-size:12.5px; opacity:0; pointer-events:none; transition:opacity .2s; z-index:980; white-space:nowrap; max-width:90vw; overflow:hidden; text-overflow:ellipsis; }
 #toast.show { opacity:1; }
 .n-list { width:190px; border-right:1px solid var(--outline); padding:8px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
@@ -326,6 +327,7 @@ function applySettings(){
   try { if (window.zikBridge && zikBridge.setFullscreen) zikBridge.setFullscreen(settings.fs!==false); } catch(e){}
   document.body.classList.toggle('light', !settings.dark);
   document.body.classList.toggle('fs-hide', settings.fs!==false);
+  try { if (window.zikBridge && zikBridge.setBtInput) zikBridge.setBtInput(settings.btIn===true); } catch(e){}
   document.documentElement.style.setProperty('--accent', ACCENTS[settings.accent]||ACCENTS[0]);
   $('#os').style.background = (WALLS[settings.wallpaper]||WALLS[0]).css;
   updateThemeBtn();
@@ -638,7 +640,7 @@ function renderMenu(){
   m.innerHTML = '<div class="search">'+IC.search+'<input id="menu-q" placeholder="Поиск приложений"></div>'
    +'<div class="mtabs"><button class="mtab active" id="mtab-sys">Рабочий стол</button><button class="mtab" id="mtab-mine">Мои приложения</button></div>'
    +'<div class="grid" id="menu-grid"></div>'
-   +'<footer><div class="ava">H</div><div class="who">hikari<small>user@hikarios · HikariOS 2.9</small></div>'
+   +'<footer><div class="ava">H</div><div class="who">hikari<small>user@hikarios · HikariOS 3.0</small></div>'
    +'<button class="tb-btn" id="pwr" title="Выключение">'+IC.power+'</button></footer>';
   var grid = m.querySelector('#menu-grid');
   var tab = 'sys';
@@ -1379,8 +1381,11 @@ function renderSettings(root){
    +'<div class="s-card"><h3>Обои</h3><div class="swatches" id="s-wp"></div></div>'
    +'<div class="s-card"><h3>Акцентный цвет</h3><div class="swatches" id="s-acc"></div></div>'
    +'<div class="s-card"><h3>Оформление</h3><div class="tgl-row"><span>Тёмная тема</span><div class="tgl" id="s-dark"></div></div></div>'
+   +'<div class="s-card"><h3>Bluetooth-клавиатура и мышь</h3>'
+   +'<div class="tgl-row"><span>Приём ввода с телефона</span><div class="tgl" id="s-bt"></div></div>'
+   +'<div style="font-size:11.5px;color:var(--muted);margin-top:8px">Сопряги телефон с планшетом в настройках Android, поставь на телефон приложение Hikari Remote, включи этот переключатель и подключись.</div></div>'
    +'<div class="s-card"><h3>О системе</h3>'
-   +'<div class="kv"><span>ОС</span>HikariOS 2.0 (WebView Edition)</div>'
+   +'<div class="kv"><span>ОС</span>HikariOS 3.0 (WebView Edition)</div>'
    +'<div class="kv"><span>Устройство</span>ZIK W1027</div>'
    +'<div class="kv"><span>Пользователь</span>zik</div>'
    +'<div class="kv"><span>Движок</span>Chromium WebView</div>'
@@ -1401,6 +1406,16 @@ function renderSettings(root){
     d.onclick=function(){ settings.accent=i; saveSettings(); renderSettings(root); };
     ac.appendChild(d);
   });
+  var bt2 = root.querySelector('#s-bt');
+  bt2.classList.toggle('on', settings.btIn===true);
+  bt2.onclick=function(){
+    settings.btIn = settings.btIn!==true;
+    saveSettings();
+    bt2.classList.toggle('on', settings.btIn);
+    try { if (window.zikBridge && zikBridge.setBtInput){ zikBridge.setBtInput(settings.btIn); toast(settings.btIn?'Bluetooth-вход включён':'Bluetooth-вход выключен'); } }
+    catch(e){ toast('Работает на планшете с HikariOS'); }
+    renderSettings(root);
+  };
   var dk = root.querySelector('#s-dark');
   dk.classList.toggle('on', settings.dark);
   dk.onclick=function(){ settings.dark=!settings.dark; saveSettings(); dk.classList.toggle('on', settings.dark); };
@@ -2087,6 +2102,83 @@ function runBoot(){
   $('#boot').addEventListener('pointerdown', function(){ clearInterval(t); finishBoot(); });
 }
 applySettings();
+
+// ---------- Bluetooth-ввод с телефона (Hikari Remote) ----------
+var RM = { x:null, y:null };
+function rmCursor(){
+  var c = document.getElementById('rcur');
+  if (!c){
+    c = document.createElement('div'); c.id='rcur';
+    c.innerHTML = '<svg viewBox="0 0 24 26" width="20" height="24"><path d="M4 2l16 9-7 1.5L16.5 20 13 21.5 10 14 4 18z" fill="#fff" stroke="#111" stroke-width="1.3"/></svg>';
+    document.body.appendChild(c);
+  }
+  return c;
+}
+function rmFire(el, type, btn, dy){
+  var o = { bubbles:true, cancelable:true, view:window, clientX:RM.x, clientY:RM.y, button:btn||0 };
+  var e;
+  if (type==='wheel' && window.WheelEvent){ e = new WheelEvent('wheel', {bubbles:true, cancelable:true, clientX:RM.x, clientY:RM.y, deltaY:dy||0, deltaMode:0}); }
+  else if (window.PointerEvent){ e = new PointerEvent(type, o); }
+  else { e = new MouseEvent(type, o); }
+  el.dispatchEvent(e);
+}
+function rmTarget(){ return document.elementFromPoint(RM.x, RM.y) || document.body; }
+window.__remoteIn = function(p){
+  try {
+    if (!p || !p.t) return;
+    if (p.t==='st'){
+      if (p.s==='on') toast('Bluetooth: подключено'+(p.n?' — '+p.n:''));
+      else if (p.s==='lost') toast('Bluetooth: устройство отключилось');
+      else if (p.s==='off') toast('Bluetooth-вход выключен');
+      else if (p.s==='nobt') toast('Включи Bluetooth на планшете');
+      else toast('Bluetooth: нет соединения');
+      return;
+    }
+    if (p.t==='m'){
+      if (RM.x===null){ RM.x=Math.round(window.innerWidth/2); RM.y=Math.round(window.innerHeight/2); }
+      RM.x=Math.max(0, Math.min(window.innerWidth, RM.x+(p.dx||0)*1.8));
+      RM.y=Math.max(0, Math.min(window.innerHeight, RM.y+(p.dy||0)*1.8));
+      var c=rmCursor();
+      c.style.display='block'; c.style.left=RM.x+'px'; c.style.top=RM.y+'px';
+      var t=rmTarget();
+      rmFire(t,'pointermove',0); rmFire(t,'mousemove',0);
+      return;
+    }
+    if (p.t==='c'){
+      if (RM.x===null) return;
+      var t=rmTarget();
+      if (p.b===2){ rmFire(t,'contextmenu',2); rmFire(t,'mouseup',2); return; }
+      rmFire(t,'pointerdown',0); rmFire(t,'mousedown',0); rmFire(t,'pointerup',0); rmFire(t,'mouseup',0); rmFire(t,'click',0);
+      return;
+    }
+    if (p.t==='s'){
+      if (RM.x===null) return;
+      rmFire(rmTarget(),'wheel',0,(p.d||0)*3);
+      return;
+    }
+    if (p.t==='k'){
+      var el=document.activeElement;
+      if (el && (el.tagName==='TEXTAREA'||el.tagName==='INPUT')){
+        var a = el.selectionStart!=null?el.selectionStart:el.value.length;
+        var b = el.selectionEnd!=null?el.selectionEnd:a;
+        el.value=el.value.slice(0,a)+(p.c||'')+el.value.slice(b);
+        try { el.setSelectionRange(a+(p.c||'').length, a+(p.c||'').length); } catch(e){}
+        el.dispatchEvent(new Event('input',{bubbles:true}));
+      } else {
+        document.execCommand('insertText', false, p.c||'');
+      }
+      return;
+    }
+    if (p.t==='e'){
+      var el2=document.activeElement||document.body;
+      var key={enter:'Enter',back:'Backspace',left:'ArrowLeft',right:'ArrowRight',up:'ArrowUp',down:'ArrowDown',tab:'Tab'}[p.k||''];
+      if (!key) return;
+      el2.dispatchEvent(new KeyboardEvent('keydown',{key:key,code:key,bubbles:true,cancelable:true}));
+      if (p.k==='back') document.execCommand('delete');
+      return;
+    }
+  } catch(e){}
+};
 buildTaskbar();
 buildDeskIcons();
 $('#pwr-on').addEventListener('click', function(){ location.reload(); });
