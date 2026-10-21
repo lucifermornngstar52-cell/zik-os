@@ -1,0 +1,1838 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>HikariOS</title>
+<style>
+:root { --accent:#3B82F6; }
+* { box-sizing:border-box; margin:0; padding:0; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+html,body { width:100%; height:100%; overflow:hidden; }
+body { --surface:#151B26; --surface2:#1B2330; --text:#E7EDF3; --muted:#8B97A6; --outline:#2A3341; --card:#1B2431; }
+body.light { --surface:#F3F5F8; --surface2:#E8ECF1; --text:#101720; --muted:#5A6673; --outline:#C9D2DC; --card:#FFFFFF; }
+body { font-family:system-ui, Roboto, sans-serif; background:#000; color:var(--text); touch-action:manipulation; }
+input, textarea { -webkit-user-select:text; user-select:text; }
+button { font-family:inherit; }
+.hidden { display:none !important; }
+
+#boot { position:fixed; inset:0; background:#000; padding:28px; z-index:999; display:flex; flex-direction:column; }
+#boot .lines { font:13px/1.7 monospace; color:#7DE3A3; white-space:pre-wrap; flex:1; overflow:hidden; }
+#boot .logo { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
+#boot .logo .z { width:34px; height:34px; border-radius:9px; background:var(--accent); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:20px; }
+#boot .logo b { color:#fff; font-size:20px; letter-spacing:2px; font-weight:600; }
+#boot .lines { font:13px/1.7 monospace; color:#7DE3A3; white-space:pre-wrap; flex:1; overflow:hidden; }
+#boot .bar { height:3px; background:#1c2530; border-radius:2px; overflow:hidden; margin-top:10px; }
+#boot .bar i { display:block; height:100%; background:var(--accent); transition:width .2s; }
+#boot .hint { color:#444; font-size:11px; margin-top:10px; }
+
+#os { position:fixed; inset:0; display:none; background:linear-gradient(135deg,#0B1220,#1E293B 55%,#312E81); }
+#os::before { content:''; position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size:46px 46px; pointer-events:none; }
+#desk-icons { position:absolute; inset:0; bottom:48px; z-index:4; pointer-events:none; }
+.dicon { position:absolute; width:84px; text-align:center; border-radius:12px; padding:8px; cursor:pointer; pointer-events:auto; touch-action:none; }
+.dicon:active { background:rgba(255,255,255,.12); }
+.dicon .ic { width:48px; height:48px; margin:0 auto; border-radius:12px; background:rgba(15,20,30,.55); display:flex; align-items:center; justify-content:center; }
+body.light .dicon .ic { background:rgba(255,255,255,.55); }
+.dicon .ic svg { width:26px; height:26px; fill:var(--accent); }
+.dicon span { display:block; color:#fff; font-size:11px; margin-top:5px; text-shadow:0 1px 3px rgba(0,0,0,.6); }
+
+#windows { position:absolute; left:0; top:0; right:0; bottom:48px; overflow:hidden; }
+
+#taskbar { position:absolute; left:0; right:0; bottom:0; height:48px; background:rgba(16,21,30,.92); border-top:1px solid var(--outline); display:flex; align-items:center; z-index:500; }
+body.light #taskbar { background:rgba(243,245,248,.94); }
+.tb-center { flex:1; display:flex; align-items:center; justify-content:center; gap:4px; }
+.tb-btn { width:46px; height:42px; border:0; background:transparent; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; }
+.tb-btn svg { width:20px; height:20px; fill:var(--muted); pointer-events:none; }
+.tb-btn:active { background:rgba(128,150,180,.25); }
+.tb-btn.active { background:rgba(59,130,246,.18); }
+.tb-btn.active svg { fill:var(--accent); }
+.tb-btn.running svg { fill:var(--text); }
+.tb-btn .ind { position:absolute; bottom:3px; left:50%; transform:translateX(-50%); height:3px; border-radius:2px; background:var(--accent); width:0; transition:width .15s; }
+.tb-btn.running .ind { width:8px; }
+.tb-btn.running.focused .ind { width:16px; }
+.tb-right { display:flex; align-items:center; padding-right:10px; gap:2px; }
+#clock { font-size:12.5px; padding:0 10px; }
+
+#menu { position:absolute; bottom:56px; left:50%; transform:translateX(-50%); width:470px; max-width:calc(100vw - 16px); height:480px; max-height:calc(100vh - 70px); background:rgba(21,27,38,.88); backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px); border:1px solid var(--outline); border-radius:12px; display:flex; flex-direction:column; z-index:600; box-shadow:0 20px 60px rgba(0,0,0,.5); }
+body.light #menu { background:rgba(243,245,248,.9); }
+#menu .search { margin:12px; display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.06); border:1px solid var(--outline); border-radius:20px; padding:9px 14px; }
+#menu .search svg { width:16px; height:16px; fill:var(--muted); flex-shrink:0; }
+#menu .search input { flex:1; border:0; background:transparent; color:var(--text); font-size:13px; outline:none; }
+#menu .label { padding:0 16px 6px; font-size:12px; font-weight:600; color:var(--muted); }
+#menu .grid { flex:1; overflow-y:auto; display:grid; grid-template-columns:repeat(4,1fr); padding:4px 10px 10px; align-content:start; }
+.tile { display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px 4px; border-radius:10px; cursor:pointer; font-size:11px; text-align:center; }
+.tile:active { background:rgba(128,150,180,.2); }
+.tile .ic { width:44px; height:44px; border-radius:10px; background:rgba(59,130,246,.14); display:flex; align-items:center; justify-content:center; }
+.tile .ic svg { width:22px; height:22px; fill:var(--accent); }
+#menu footer { border-top:1px solid var(--outline); display:flex; align-items:center; padding:8px 12px; gap:10px; }
+#menu footer .ava { width:26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; }
+#menu footer .who { flex:1; line-height:1.25; font-size:12px; font-weight:600; }
+#menu footer .who small { display:block; font-weight:400; color:var(--muted); font-size:10px; }
+
+.win { position:absolute; background:var(--surface); border:1px solid var(--outline); border-radius:10px; display:flex; flex-direction:column; box-shadow:0 8px 30px rgba(0,0,0,.45); overflow:hidden; z-index:10; animation:pop .15s ease-out; }
+@keyframes pop { from { transform:scale(.97); opacity:.4 } to { transform:scale(1); opacity:1 } }
+.win.focused { border-color:rgba(59,130,246,.55); box-shadow:0 16px 50px rgba(0,0,0,.6); }
+.win.max { border-radius:0; border:0; }
+.tbar { height:36px; display:flex; align-items:center; gap:8px; padding:0 8px; background:var(--surface2); touch-action:none; flex-shrink:0; }
+.tbar .appic { display:flex; flex-shrink:0; }
+.tbar .appic svg { width:15px; height:15px; fill:var(--accent); }
+.tbar .ttl { flex:1; font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.wbtn { width:28px; height:26px; border:0; border-radius:6px; background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.wbtn:active { background:rgba(128,150,180,.3); }
+.wbtn.close:active { background:#e5484d; }
+.wbtn svg { width:13px; height:13px; fill:var(--text); pointer-events:none; }
+.wbody { flex:1; overflow:hidden; position:relative; display:flex; flex-direction:column; }
+.rsz { position:absolute; right:0; bottom:0; width:24px; height:24px; cursor:nwse-resize; touch-action:none; z-index:5; }
+.rsz::before { content:''; position:absolute; right:5px; bottom:5px; width:8px; height:8px; border-right:2px solid var(--muted); border-bottom:2px solid var(--muted); }
+
+.term { flex:1; background:#0A0E14; display:flex; flex-direction:column; font:13px/1.55 monospace; }
+.t-out { flex:1; overflow-y:auto; padding:10px; color:#C7E8D0; white-space:pre-wrap; word-break:break-word; }
+.t-in { display:flex; gap:6px; background:#11161D; padding:8px 10px; align-items:center; }
+.t-ps { color:#7DE3A3; white-space:nowrap; }
+.t-i { flex:1; background:transparent; border:0; outline:none; color:#E6EDF3; font:13px/1.4 monospace; caret-color:#7DE3A3; }
+
+.f-bar { display:flex; align-items:center; gap:4px; padding:6px 8px; background:var(--surface); flex-shrink:0; }
+.f-bar button { border:1px solid var(--outline); background:var(--card); color:var(--text); border-radius:8px; padding:6px 9px; font-size:12px; cursor:pointer; display:flex; align-items:center; gap:4px; }
+.f-bar button svg { width:14px; height:14px; fill:var(--text); }
+.f-crumbs { flex:1; overflow-x:auto; white-space:nowrap; display:flex; align-items:center; }
+.f-crumbs button { border:0; background:transparent; color:var(--accent); padding:4px 2px; font-size:12px; cursor:pointer; flex-shrink:0; }
+.f-grid { flex:1; overflow-y:auto; padding:8px; display:grid; grid-template-columns:repeat(auto-fill, minmax(96px,1fr)); gap:8px; align-content:start; }
+.f-item { border:1px solid var(--outline); background:var(--card); border-radius:10px; padding:10px 6px; text-align:center; cursor:pointer; }
+.f-item:active { background:rgba(59,130,246,.15); }
+.f-item svg { width:32px; height:32px; }
+.f-item .nm { font-size:11px; margin-top:6px; word-break:break-all; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.f-empty { grid-column:1/-1; text-align:center; color:var(--muted); padding:40px 0; font-size:13px; }
+
+.e-bar { display:flex; align-items:center; gap:6px; padding:6px 8px; flex-shrink:0; }
+.e-bar .fn { flex:1; font:12px monospace; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.e-bar select { background:var(--card); color:var(--text); border:1px solid var(--outline); border-radius:8px; padding:5px; font-size:12px; outline:none; }
+.e-bar button { border:1px solid var(--outline); background:var(--card); color:var(--text); border-radius:8px; padding:6px 9px; font-size:12px; cursor:pointer; }
+.ed-wrap { flex:1; display:flex; background:#0D1117; overflow:hidden; }
+.gutter { padding:8px 6px; text-align:right; font:13px/1.5 monospace; color:#4B5563; background:#0D1117; overflow:hidden; white-space:pre; min-width:44px; }
+.code-area { position:relative; flex:1; }
+.code-area pre, .code-area textarea { position:absolute; inset:0; margin:0; padding:8px; font:13px/1.5 monospace; white-space:pre; overflow:auto; tab-size:4; border:0; }
+.code-area pre { pointer-events:none; color:#E6EDF3; }
+.hl .c { color:#6A9955 } .hl .s { color:#CE9178 } .hl .n { color:#B5CEA8 } .hl .k { color:#569CD6 }
+.code-area textarea { background:transparent; color:transparent; caret-color:#fff; outline:none; resize:none; -webkit-text-fill-color:transparent; }
+.e-stat { height:22px; display:flex; align-items:center; padding:0 10px; font-size:10px; color:var(--muted); background:var(--surface2); flex-shrink:0; }
+.e-prev { flex:1; border:0; background:#fff; }
+
+.c-tabs { display:flex; border-bottom:1px solid var(--outline); flex-shrink:0; }
+.c-tabs button { flex:1; padding:10px 4px; border:0; background:transparent; color:var(--muted); font-size:12px; cursor:pointer; border-bottom:2px solid transparent; }
+.c-tabs button.on { color:var(--accent); border-bottom-color:var(--accent); font-weight:600; }
+.c-body { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px; }
+.c-body label { font-size:12px; color:var(--muted); margin-bottom:4px; display:block; }
+.c-body select, .c-body input[type=text] { width:100%; background:var(--card); color:var(--text); border:1px solid var(--outline); border-radius:8px; padding:10px; font-size:14px; outline:none; }
+.row2 { display:flex; gap:8px; align-items:flex-end; }
+.row2 > div { flex:1 }
+.swapbtn { border:1px solid var(--outline); background:var(--card); color:var(--text); border-radius:8px; padding:10px 12px; font-size:14px; cursor:pointer; flex-shrink:0; }
+.c-res { background:var(--card); border:1px solid var(--outline); border-radius:12px; padding:18px; text-align:center; }
+.c-res b { font-size:28px; color:var(--accent); word-break:break-all; display:block; }
+.c-res small { display:block; color:var(--muted); margin-top:4px; font-size:12px; }
+.chiprow { display:flex; flex-wrap:wrap; gap:8px; }
+.chip { border:1px solid var(--outline); background:var(--card); color:var(--text); border-radius:18px; padding:8px 14px; font-size:12px; cursor:pointer; }
+.chip:active { background:rgba(59,130,246,.2); }
+textarea.ta { width:100%; min-height:84px; background:var(--card); color:var(--text); border:1px solid var(--outline); border-radius:8px; padding:10px; font:13px/1.5 monospace; outline:none; resize:vertical; }
+
+.s-list { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px; }
+.s-card { background:var(--card); border:1px solid var(--outline); border-radius:12px; padding:14px; }
+.s-card h3 { font-size:13px; margin-bottom:10px; }
+.swatches { display:flex; flex-wrap:wrap; gap:10px; }
+.wp-sw { width:74px; height:44px; border-radius:8px; border:3px solid transparent; cursor:pointer; }
+.wp-sw.on { border-color:var(--accent); }
+.acc-sw { width:38px; height:38px; border-radius:50%; border:3px solid transparent; cursor:pointer; }
+.acc-sw.on { border-color:var(--text); }
+.kv { display:flex; font-size:13px; padding:3px 0; }
+.kv span { width:120px; color:var(--muted); font-size:12px; }
+.tgl-row { display:flex; align-items:center; justify-content:space-between; }
+.tgl { position:relative; width:44px; height:24px; border-radius:12px; background:#3A4454; cursor:pointer; transition:.2s; }
+.tgl::after { content:''; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:.2s; }
+.tgl.on { background:var(--accent); } .tgl.on::after { left:23px; }
+
+#ctx { position:fixed; z-index:900; background:var(--surface2); border:1px solid var(--outline); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.5); padding:5px; min-width:180px; }
+#ctx button { display:flex; align-items:center; gap:8px; width:100%; border:0; background:transparent; color:var(--text); padding:9px 12px; font-size:13px; border-radius:7px; cursor:pointer; text-align:left; }
+#ctx button svg { width:15px; height:15px; fill:var(--text); }
+#ctx button:active { background:rgba(59,130,246,.18); }
+#ctx button.danger { color:#F87171; } #ctx button.danger svg { fill:#F87171; }
+
+#dlg-wrap { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:950; display:flex; align-items:center; justify-content:center; }
+.dlg { width:min(340px, 90vw); background:var(--surface); border:1px solid var(--outline); border-radius:12px; padding:16px; }
+.dlg h4 { font-size:15px; margin-bottom:12px; }
+.dlg input { width:100%; background:var(--card); color:var(--text); border:1px solid var(--outline); border-radius:8px; padding:10px; font-size:14px; outline:none; margin-bottom:14px; }
+.dlg .acts { display:flex; gap:8px; justify-content:flex-end; }
+.dlg .acts button { border:0; border-radius:8px; padding:8px 14px; font-size:13px; cursor:pointer; }
+.dlg .ok { background:var(--accent); color:#fff; }
+.dlg .cancel { background:transparent; color:var(--muted); }
+
+#shutdown { position:fixed; inset:0; background:#000; z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:#556; }
+#shutdown .zlogo { width:44px; height:44px; border-radius:11px; background:#1a2230; display:flex; align-items:center; justify-content:center; color:#667; font-weight:700; font-size:24px; }
+#toast { position:fixed; left:50%; bottom:64px; transform:translateX(-50%); background:#1B2431; color:#fff; border:1px solid var(--outline); padding:9px 16px; border-radius:18px; font-size:12.5px; opacity:0; pointer-events:none; transition:opacity .2s; z-index:980; white-space:nowrap; max-width:90vw; overflow:hidden; text-overflow:ellipsis; }
+#toast.show { opacity:1; }
+.n-list { width:190px; border-right:1px solid var(--outline); padding:8px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; flex-shrink:0; }
+.n-item { position:relative; background:var(--card); border:1px solid var(--outline); border-radius:8px; padding:8px 26px 8px 10px; cursor:pointer; }
+.n-item.on { border-color:var(--accent); background:rgba(59,130,246,.12); }
+.n-item .n-t { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.n-item .n-d { font-size:10px; color:var(--muted); margin-top:2px; }
+.n-x { position:absolute; top:5px; right:4px; border:0; background:transparent; color:var(--muted); font-size:14px; width:20px; height:20px; border-radius:5px; cursor:pointer; }
+.n-x:active { background:rgba(245,63,63,.25); color:#F87171; }
+.n-edit { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.n-head { display:flex; align-items:center; padding:8px 10px; gap:8px; flex-shrink:0; }
+.n-head span { flex:1; font-weight:600; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.n-edit textarea { flex:1; min-height:0; border:0; border-radius:0; background:var(--surface); }
+.g-bar { display:flex; gap:6px; padding:6px 8px; align-items:center; flex-shrink:0; }
+.g-bar select { background:var(--card); color:var(--text); border:1px solid var(--outline); border-radius:8px; padding:5px; font-size:12px; outline:none; max-width:200px; }
+.g-msgs { flex:1; overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:8px; }
+.g-m { max-width:88%; padding:8px 12px; border-radius:12px; font-size:13px; line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+.g-m.user { align-self:flex-end; background:var(--accent); color:#fff; border-bottom-right-radius:4px; }
+.g-m.bot { align-self:flex-start; background:var(--card); border:1px solid var(--outline); border-bottom-left-radius:4px; }
+.g-m.err { align-self:stretch; background:rgba(245,63,63,.12); color:#F87171; border:1px solid rgba(245,63,63,.3); font-size:12px; }
+.g-m .g-name { display:block; font-size:10px; color:var(--muted); margin-bottom:2px; }
+.g-code { display:block; background:#0D1117; border:1px solid var(--outline); border-radius:8px; padding:8px; margin:6px 0; font:12px/1.45 monospace; overflow-x:auto; white-space:pre; color:#E6EDF3; }
+.g-tocode { border:1px solid var(--outline); background:rgba(59,130,246,.15); color:var(--accent); border-radius:8px; padding:4px 10px; font-size:11px; cursor:pointer; margin-top:4px; }
+.g-in { display:flex; gap:8px; padding:8px; flex-shrink:0; align-items:flex-end; border-top:1px solid var(--outline); }
+.g-in textarea { flex:1; min-height:38px; max-height:110px; }
+.g-in button { border:0; background:var(--accent); color:#fff; border-radius:8px; padding:10px 14px; font-size:13px; cursor:pointer; flex-shrink:0; }
+.pc-head { display:flex; align-items:center; gap:14px; padding:14px 14px 10px; }
+.pc-head .big { width:52px; height:52px; border-radius:12px; background:rgba(59,130,246,.15); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.pc-head .big svg { width:30px; height:30px; fill:var(--accent); }
+.pc-head h3 { font-size:16px; }
+.pc-head small { color:var(--muted); font-size:11px; }
+.pc-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:4px 14px 14px; }
+.pc-card h4 { font-size:11px; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:.5px; }
+.pc-kv { display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0; gap:10px; }
+.pc-kv b { font-weight:600; text-align:right; word-break:break-all; }
+.pc-kv span { color:var(--muted); flex-shrink:0; }
+.bar2 { height:6px; border-radius:3px; background:var(--outline); overflow:hidden; margin-top:6px; }
+.bar2 i { display:block; height:100%; background:var(--accent); border-radius:3px; }
+
+.br-bar { display:flex; gap:6px; padding:6px 8px; align-items:center; flex-shrink:0; }
+.br-url { flex:1; background:var(--card); border:1px solid var(--outline); border-radius:8px; color:var(--text); font-size:13px; padding:8px 10px; outline:none; min-width:0; }
+.br-frame { flex:1; border:0; background:#fff; min-height:0; }
+.e-tabs { display:flex; gap:4px; padding:4px 8px; overflow-x:auto; flex-shrink:0; border-bottom:1px solid var(--outline); }
+.e-tab { border:1px solid var(--outline); background:var(--card); color:var(--text); border-radius:7px 7px 0 0; padding:4px 12px; font-size:12px; cursor:pointer; white-space:nowrap; }
+.e-tab.on { border-bottom-color:var(--accent); color:var(--accent); background:rgba(59,130,246,.1); }
+.br-tabs { display:flex; gap:4px; padding:4px 8px 0; overflow-x:auto; flex-shrink:0; }
+.br-tabs .e-tab { flex-shrink:0; }
+.label2 { font-size:11px; color:var(--muted); margin:10px 0 6px; }
+.bm-list { display:flex; flex-direction:column; gap:4px; }
+.bm-row { display:flex; align-items:center; gap:8px; }
+.bm-row .bm-url { flex:1; font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.hub-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; }
+.hub-card { background:var(--card); border:1px solid var(--outline); border-radius:10px; padding:12px; }
+.hub-name { font-size:14px; font-weight:600; }
+.hub-path { font-size:11px; color:var(--muted); margin:4px 0 8px; word-break:break-all; }
+.hub-btns { display:flex; gap:6px; }
+.run-frame { flex:1; border:0; background:#fff; min-height:0; }
+.e-find { display:flex; gap:6px; padding:6px 8px; border-bottom:1px solid var(--outline); align-items:center; }
+.e-logs { height:110px; overflow-y:auto; background:#0D1117; border-top:1px solid var(--outline); font:11px/1.5 monospace; color:#9aa4b2; padding:4px 8px; flex-shrink:0; }
+.e-log { white-space:pre-wrap; word-break:break-all; }
+.e-log.e-error { color:#F87171; }
+.e-log.e-warn { color:#FBBF24; }
+#grid-overlay { display:none; position:fixed; inset:0; pointer-events:none; background-image:linear-gradient(rgba(120,160,255,.09) 1px, transparent 1px), linear-gradient(90deg, rgba(120,160,255,.09) 1px, transparent 1px); background-size:94px 95px; background-position:10px 10px; }
+.dicon { transition:transform .12s, filter .12s; }
+.dicon.held { transform:scale(1.14); filter:brightness(1.3); }
+</style>
+</head>
+<body>
+<div id="boot">
+  <div class="logo"><div class="z">H</div><b>HikariOS</b></div>
+  <div class="lines" id="boot-lines"></div>
+  <div class="bar"><i id="boot-bar" style="width:0%"></i></div>
+  <div class="hint">Нажмите в любом месте, чтобы пропустить</div>
+</div>
+<div id="os">
+  <div id="desk-icons"></div>
+  <div id="windows"></div>
+  <div id="menu" class="hidden"></div>
+  <div id="taskbar">
+    <div class="tb-center" id="tb-center"></div>
+    <div class="tb-right"><span id="clock"></span><button class="tb-btn" id="theme-btn" title="Тема"></button></div>
+  </div>
+  <div id="shutdown" class="hidden"><div class="zlogo">Z</div><div>Питание выключено</div><button class="chip" id="pwr-on">Включить</button></div>
+</div>
+<div id="ctx" class="hidden"></div>
+<div id="dlg-wrap" class="hidden"></div>
+<div id="toast"></div>
+<script>
+'use strict';
+var $ = function(s){ return document.querySelector(s); };
+var bootT = Date.now();
+
+// ---------- иконки ----------
+var IC = {
+  files:'<svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>',
+  terminal:'<svg viewBox="0 0 24 24"><path d="M3 4h18c.55 0 1 .45 1 1v14c0 .55-.45 1-1 1H3c-.55 0-1-.45-1-1V5c0-.55.45-1 1-1zm1 3v11h16V7H4zm2.5 2.5L5.3 10.7 7.6 13l-2.3 2.3 1.2 1.2 3.5-3.5-3.5-3.5zM11 14.5h6v1.7h-6v-1.7z"/></svg>',
+  code:'<svg viewBox="0 0 24 24"><path d="M9.4 16.6 4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0 4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>',
+  converter:'<svg viewBox="0 0 24 24"><path d="M6.99 11 3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg>',
+  settings:'<svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .11-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.11.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.11.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.23.41.47.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.11-.61l-2.01-1.58zM12 15.6A3.61 3.61 0 0 1 8.4 12c0-1.98 1.62-3.6 3.6-3.6s3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>',
+  start:'<svg viewBox="0 0 24 24"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>',
+  min:'<svg viewBox="0 0 24 24"><path d="M6 11h12v2H6z"/></svg>',
+  max:'<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4V4zm2 2v12h12V6H6z"/></svg>',
+  restore:'<svg viewBox="0 0 24 24"><path d="M8 8h12v12H8V8zm-4 8V4h12v2H6v10H4z"/></svg>',
+  close:'<svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>',
+  search:'<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>',
+  power:'<svg viewBox="0 0 24 24"><path d="M13 3h-2v10h2V3zm4.83 2.17-1.42 1.42A6.92 6.92 0 0 1 19 12c0 3.87-3.13 7-7 7A6.995 6.995 0 0 1 7.58 6.58L6.17 5.17A8.932 8.932 0 0 0 3 12a9 9 0 1 0 18 0c0-2.12-.74-4.07-1.97-5.61z"/></svg>',
+  rename:'<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>',
+  trash:'<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
+  up:'<svg viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>',
+  newfolder:'<svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-1 8h-3v3h-2v-3h-3v-2h3V9h2v3h3v2z"/></svg>',
+  newfile:'<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 14h-3v3h-2v-3H8v-2h3v-3h2v3h3v2zm-3-7V3.5L18.5 9H13z"/></svg>',
+  grok:'<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM7 9h10v2H7V9zm7 5H7v-2h7v2zm3-6H7V6h10v2z"/></svg>',
+  mypc:'<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v9c0 1.1-.9 2-2 2h-6v2h2v2H8v-2h2v-2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm0 2v9h16V6H4z"/></svg>',
+  browser:'<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>',
+  apps:'<svg viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>',
+  notes:'<svg viewBox="0 0 24 24"><path d="M19 3H4.99C3.88 3 3 3.9 3 5v14c0 1.1.88 2 1.99 2H19c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 12h-4c0 1.1-.9 2-2 2s-2-.9-2-2H4.99V5H19v10z"/><path d="M7 9h10V7.5H7V9zm0 3h7v-1.5H7V12z"/></svg>',
+  sun:'<svg viewBox="0 0 24 24"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm13-9.5h-2v3h2V1zm-6.76 3.34L8.45 3.05 7.04 4.46l1.79 1.79 1.41-1.41zM20.5 10.5H21v2h-3v-2h2.5zm-1.69-5.04l1.41-1.41-1.79-1.8-1.42 1.42 1.8 1.79zM18 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0zm-6 4.5A4.5 4.5 0 1 0 7.5 12 4.5 4.5 0 0 0 12 16.5z"/></svg>',
+  moon:'<svg viewBox="0 0 24 24"><path d="M9.37 5.51A7.35 7.35 0 0 0 9.1 7.5c0 4.08 3.32 7.4 7.4 7.4.68 0 1.35-.09 1.99-.27A7.014 7.014 0 0 1 12 19c-3.86 0-7-3.14-7-7 0-2.93 1.81-5.45 4.37-6.49z"/></svg>'
+};
+
+var DEMO_HTML = '<!DOCTYPE html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n<title>HikariOS Demo<\/title>\n<style>\nbody { font-family: sans-serif; background: linear-gradient(135deg, #0f172a, #312e81); color: #e2e8f0; display: flex; min-height: 100vh; align-items: center; justify-content: center; margin:0; }\n.card { background: rgba(255,255,255,.06); padding: 32px 40px; border-radius: 16px; text-align: center; }\nh1 { color: #93c5fd; margin: 0 0 8px; }\nbutton { margin-top: 16px; padding: 10px 22px; border: 0; border-radius: 10px; background: #3b82f6; color: white; font-size: 15px; }\np { margin: 6px 0; }\n<\/style>\n<\/head>\n<body>\n<div class="card">\n<h1>Привет из HikariOS!<\/h1>\n<p>Это живой предпросмотр HTML прямо на планшете.<\/p>\n<button onclick="onClick()">Нажми меня<\/button>\n<p id="out"><\/p>\n<\/div>\n<script>\nfunction onClick() { document.getElementById("out").textContent = "JS работает! " + new Date().toLocaleTimeString(); }\n<\/script>\n<\/body>\n<\/html>';
+
+// ---------- настройки ----------
+var ACCENTS = ['#3B82F6','#8B5CF6','#10B981','#F59E0B','#EF4444','#06B6D4','#EC4899','#84CC16','#F97316','#A855F7'];
+var WALLS = [
+ {name:'Ночной город', css:'linear-gradient(135deg,#0B1220,#1E293B 55%,#312E81)'},
+ {name:'Изумруд', css:'linear-gradient(135deg,#020617,#064E3B,#0F766E)'},
+ {name:'Закат', css:'linear-gradient(135deg,#1C1917,#7C2D12,#BE123C)'},
+ {name:'Океан', css:'linear-gradient(135deg,#020617,#1E3A8A,#0EA5E9)'},
+ {name:'Bloom', css:'radial-gradient(1100px 780px at 68% 32%, rgba(99,102,241,.55), transparent 62%), radial-gradient(900px 720px at 24% 74%, rgba(14,165,233,.5), transparent 58%), radial-gradient(760px 520px at 86% 82%, rgba(217,70,239,.32), transparent 62%), linear-gradient(160deg,#0b1026,#111b3a)'},
+ {name:'Aurora', css:'radial-gradient(1000px 640px at 20% 22%, rgba(16,185,129,.45), transparent 60%), radial-gradient(920px 700px at 78% 62%, rgba(59,130,246,.42), transparent 60%), linear-gradient(160deg,#031b1b,#07203a)'},
+ {name:'Magma', css:'radial-gradient(900px 700px at 74% 26%, rgba(249,115,22,.5), transparent 56%), radial-gradient(820px 620px at 22% 78%, rgba(190,18,60,.45), transparent 60%), linear-gradient(160deg,#170b0e,#24101c)'},
+ {name:'Полночь', css:'radial-gradient(1000px 700px at 30% 28%, rgba(96,165,250,.55), transparent 58%), radial-gradient(820px 640px at 72% 72%, rgba(148,163,184,.4), transparent 62%), linear-gradient(160deg,#0f172a,#1e293b)'}
+];
+function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function lsSet(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+var settings = JSON.parse(lsGet('zikos_settings')||'null') || { wallpaper:0, accent:0, dark:true };
+function applySettings(){
+  if (settings.openMax===undefined) settings.openMax=true;
+  if (settings.fs===undefined) settings.fs=true;
+  try { if (window.zikBridge && zikBridge.setFullscreen) zikBridge.setFullscreen(settings.fs!==false); } catch(e){}
+  document.body.classList.toggle('light', !settings.dark);
+  document.documentElement.style.setProperty('--accent', ACCENTS[settings.accent]||ACCENTS[0]);
+  $('#os').style.background = (WALLS[settings.wallpaper]||WALLS[0]).css;
+  updateThemeBtn();
+}
+function saveSettings(){ lsSet('zikos_settings', JSON.stringify(settings)); applySettings(); }
+function updateThemeBtn(){ var b=$('#theme-btn'); if(b) b.innerHTML = settings.dark ? IC.sun : IC.moon; }
+
+// ---------- файловая система ----------
+var fs = JSON.parse(lsGet('zikos_fs')||'null');
+if (!fs) { fs = seedFS(); saveFS(); }
+function seedFS(){
+  var f = {};
+  f['readme.txt']={t:'f',c:'HikariOS 2.0 — мини-ОС для планшета.\n\nЭто твой домашний каталог (/home).\nТерминал, файлы и редактор кода работают с одними и теми же файлами.\nПапка projects — для кода. Открой projects/demo.html в «Код» и нажми «Превью».\n'};
+  f['projects']={t:'d'};
+  f['projects/demo.html']={t:'f',c:DEMO_HTML};
+  f['projects/hello.py']={t:'f',c:'# HikariOS поддерживает подсветку синтаксиса\ndef hello():\n    print("Привет из HikariOS!")\n\nhello()\n'};
+  return f;
+}
+function saveFS(){ lsSet('zikos_fs', JSON.stringify(fs)); }
+function norm(p){ var out=[], segs=String(p||'').split('/'); for (var i=0;i<segs.length;i++){ var s=segs[i]; if(!s||s==='.')continue; if(s==='..'){out.pop();continue;} out.push(s);} return out.join('/'); }
+function ensureParents(p){ var parts=p.split('/'); parts.pop(); var cur=''; for (var i=0;i<parts.length;i++){ if(i>0) cur+='/'; cur+=parts[i]; if(!fs[cur]) fs[cur]={t:'d'}; } }
+function isDir(p){ return p==='' ? true : (!!fs[p] && fs[p].t==='d'); }
+function fsWrite(p,c){ p=norm(p); ensureParents(p); fs[p]={t:'f',c:c}; saveFS(); }
+function fsMkdir(p){ p=norm(p); ensureParents(p); fs[p]={t:'d'}; saveFS(); }
+function fsDelete(p){ p=norm(p); if(p==='')return; delete fs[p]; var pre=p+'/', ks=Object.keys(fs); for (var i=0;i<ks.length;i++) if(ks[i].indexOf(pre)===0) delete fs[ks[i]]; saveFS(); }
+function fsRename(from,to){ from=norm(from); to=norm(to); if(from===''||to===''||from===to)return; ensureParents(to); if(fs[from]&&fs[from].t==='d'){ var pre=from+'/', ks=Object.keys(fs); for (var i=0;i<ks.length;i++){ var k=ks[i]; if(k.indexOf(pre)===0){ fs[to+k.slice(from.length)]=fs[k]; delete fs[k]; } } } fs[to]=fs[from]; delete fs[from]; saveFS(); }
+function fsList(dir){ dir=norm(dir); var pre = dir? dir+'/' : ''; var out=[]; for (var k in fs){ if(!fs.hasOwnProperty(k)||k===dir)continue; if(k.indexOf(pre)===0){ var rest=k.slice(pre.length); if(rest && rest.indexOf('/')<0) out.push({name:rest, dir:fs[k].t==='d'}); } } out.sort(function(a,b){ return (a.dir===b.dir)? a.name.localeCompare(b.name) : (a.dir?-1:1); }); return out; }
+function parentOf(p){ return p.indexOf('/')>=0 ? p.slice(0, p.lastIndexOf('/')) : ''; }
+
+// ---------- окна ----------
+var wins = {}, zTop = 10;
+function layer(){ return $('#windows'); }
+var APPS = [
+  {id:'files', title:'Файлы', w:760, h:540, icon:IC.files, render:renderFiles},
+  {id:'terminal', title:'Терминал', w:660, h:440, icon:IC.terminal, render:renderTerminal},
+  {id:'code', title:'Код', w:820, h:560, icon:IC.code, render:renderCode},
+  {id:'converter', title:'Конвертер', w:540, h:500, icon:IC.converter, render:renderConverter},
+  {id:'notes', title:'Блокнот', w:640, h:520, icon:IC.notes, render:renderNotes},
+  {id:'grok', title:'ИИ-чат', w:720, h:580, icon:IC.grok, render:renderGrok},
+  {id:'mypc', title:'Мой компьютер', w:640, h:560, icon:IC.mypc, render:renderSys},
+  {id:'browser', title:'Браузер', w:900, h:640, icon:IC.browser, render:renderBrowser},
+  {id:'apps', title:'Мои приложения', w:820, h:600, icon:IC.apps, render:renderAppsHub},
+  {id:'runapp', title:'Приложение', w:900, h:620, icon:IC.apps, render:renderRunApp, hidden:true},
+  {id:'settings', title:'Настройки', w:560, h:540, icon:IC.settings, render:renderSettings}
+];
+function appById(id){ for (var i=0;i<APPS.length;i++) if(APPS[i].id===id) return APPS[i]; return null; }
+function clampN(v,a,b){ return Math.max(a, Math.min(b,v)); }
+
+function openApp(id, arg){
+  var app = appById(id); if(!app) return;
+  if (wins[id]){
+    var w = wins[id];
+    w.minimized = false; w.el.classList.remove('hidden');
+    focusWin(id);
+    if (arg){ w.arg = arg; var body = w.el.querySelector('.wbody'); body.innerHTML=''; app.render(body, arg); }
+    syncTaskbar(); return;
+  }
+  var el = document.createElement('div');
+  el.className='win';
+  var W = Math.min(app.w, layer().clientWidth-16), H = Math.min(app.h, layer().clientHeight-16);
+  var n = Object.keys(wins).length;
+  el.style.width = W+'px'; el.style.height = H+'px';
+  el.style.left = clampN(30+n*26, 4, layer().clientWidth-W-4)+'px';
+  el.style.top = clampN(24+n*22, 4, layer().clientHeight-H-4)+'px';
+  el.innerHTML = '<div class="tbar"><span class="appic">'+app.icon+'</span><span class="ttl"></span>'
+    +'<button class="wbtn" data-a="min" title="Свернуть">'+IC.min+'</button>'
+    +'<button class="wbtn" data-a="max" title="Развернуть">'+IC.max+'</button>'
+    +'<button class="wbtn close" data-a="close" title="Закрыть">'+IC.close+'</button></div>'
+    +'<div class="wbody"></div><div class="rsz" title="Размер"></div>';
+  el.querySelector('.ttl').textContent = app.title;
+  layer().appendChild(el);
+  wins[id] = {el:el, app:app, minimized:false, maximized:false, arg:arg||null, prev:null};
+  app.render(el.querySelector('.wbody'), arg||null);
+  if (settings.openMax!==false) toggleMax(id);
+  var tbEl = el.querySelector('.tbar');
+  var lastTap=0;
+  tbEl.addEventListener('click', function(e){ if (e.target.closest('.wbtn')) return; var now=Date.now(); if (now-lastTap<380){ toggleMax(id); lastTap=0; } else lastTap=now; });
+  var btns = el.querySelectorAll('.wbtn');
+  for (var i=0;i<btns.length;i++)(function(b){
+    b.addEventListener('click', function(e){ e.stopPropagation(); var a=b.getAttribute('data-a');
+      if(a==='close') closeWin(id); else if(a==='min') minimizeWin(id); else if(a==='max') toggleMax(id);
+    });
+  })(btns[i]);
+  var tbar = el.querySelector('.tbar');
+  tbar.addEventListener('pointerdown', function(e){
+    if (e.target.closest('.wbtn')) return;
+    focusWin(id);
+    if (wins[id].maximized) return;
+    var sx=e.clientX, sy=e.clientY, ol=el.offsetLeft, ot=el.offsetTop;
+    tbar.setPointerCapture(e.pointerId);
+    var mv = function(ev){ el.style.left = clampN(ol+ev.clientX-sx, -el.offsetWidth+140, layer().clientWidth-60)+'px'; el.style.top = clampN(ot+ev.clientY-sy, 0, layer().clientHeight-40)+'px'; };
+    var up = function(){ tbar.removeEventListener('pointermove',mv); tbar.removeEventListener('pointerup',up); tbar.removeEventListener('pointercancel',up); };
+    tbar.addEventListener('pointermove',mv); tbar.addEventListener('pointerup',up); tbar.addEventListener('pointercancel',up);
+  });
+  tbar.addEventListener('dblclick', function(){ toggleMax(id); });
+  var rsz = el.querySelector('.rsz');
+  rsz.addEventListener('pointerdown', function(e){
+    e.stopPropagation(); focusWin(id);
+    var sx=e.clientX, sy=e.clientY, ow=el.offsetWidth, oh=el.offsetHeight;
+    rsz.setPointerCapture(e.pointerId);
+    var mv = function(ev){ el.style.width = clampN(ow+ev.clientX-sx, 320, layer().clientWidth-el.offsetLeft)+'px'; el.style.height = clampN(oh+ev.clientY-sy, 200, layer().clientHeight-el.offsetTop)+'px'; };
+    var up = function(){ rsz.removeEventListener('pointermove',mv); rsz.removeEventListener('pointerup',up); rsz.removeEventListener('pointercancel',up); };
+    rsz.addEventListener('pointermove',mv); rsz.addEventListener('pointerup',up); rsz.addEventListener('pointercancel',up);
+  });
+  el.addEventListener('pointerdown', function(){ focusWin(id); });
+  focusWin(id); syncTaskbar();
+}
+function focusWin(id){
+  var w=wins[id]; if(!w) return;
+  var all=document.querySelectorAll('.win');
+  for (var i=0;i<all.length;i++) all[i].classList.remove('focused');
+  w.el.classList.add('focused');
+  w.el.style.zIndex = ++zTop;
+  syncTaskbar();
+}
+function closeWin(id){ var w=wins[id]; if(!w)return; w.el.remove(); delete wins[id]; syncTaskbar(); }
+function minimizeWin(id){ var w=wins[id]; if(!w)return; w.minimized=!w.minimized; w.el.classList.toggle('hidden', w.minimized); if(!w.minimized) focusWin(id); syncTaskbar(); }
+function toggleMax(id){
+  var w=wins[id]; if(!w)return; var el=w.el;
+  if(!w.maximized){ w.prev={l:el.style.left,t:el.style.top,w:el.style.width,h:el.style.height};
+    el.style.left='0px'; el.style.top='0px'; el.style.width=layer().clientWidth+'px'; el.style.height=layer().clientHeight+'px';
+    el.classList.add('max'); w.maximized=true;
+    var mb=el.querySelector('[data-a="max"]'); if(mb) mb.innerHTML=IC.restore;
+  } else { var p=w.prev||{l:'20px',t:'20px',w:'700px',h:'500px'};
+    el.style.left=p.l; el.style.top=p.t; el.style.width=p.w; el.style.height=p.h;
+    el.classList.remove('max'); w.maximized=false;
+    var mb2=el.querySelector('[data-a="max"]'); if(mb2) mb2.innerHTML=IC.max;
+  }
+  focusWin(id);
+}
+function refreshFiles(){ if(wins.files){ var b=wins.files.el.querySelector('.wbody'); b.innerHTML=''; renderFiles(b); } }
+
+// ---------- таскбар и пуск ----------
+function syncTaskbar(){
+  var bs = document.querySelectorAll('#tb-center .app');
+  for (var i=0;i<bs.length;i++){ (function(b){
+    var w = wins[b.getAttribute('data-app')];
+    b.classList.toggle('running', !!w);
+    b.classList.toggle('focused', !!w && !w.minimized && w.el.classList.contains('focused'));
+  })(bs[i]); }
+}
+function buildTaskbar(){
+  var c = $('#tb-center');
+  var html = '<button class="tb-btn" id="start" title="Пуск">'+IC.start+'</button>';
+  for (var i=0;i<APPS.length;i++){ var a=APPS[i]; if (a.hidden) continue; html += '<button class="tb-btn app" data-app="'+a.id+'" title="'+a.title+'">'+a.icon+'<span class="ind"></span></button>'; }
+  c.innerHTML = html;
+  $('#start').addEventListener('click', toggleMenu);
+  var bs = c.querySelectorAll('.app');
+  for (var j=0;j<bs.length;j++)(function(b){
+    b.addEventListener('click', function(){
+      var id = b.getAttribute('data-app'), w = wins[id];
+      if(!w) openApp(id);
+      else if(w.minimized) minimizeWin(id);
+      else if(w.el.classList.contains('focused')) minimizeWin(id);
+      else focusWin(id);
+    });
+  })(bs[j]);
+  $('#theme-btn').addEventListener('click', function(){ settings.dark=!settings.dark; saveSettings(); });
+}
+function buildDeskIcons(){
+  var c = $('#desk-icons'); c.innerHTML='';
+  var pos = {};
+  try { pos = JSON.parse(lsGet('zikos_icons')) || {}; } catch(e){ pos={}; }
+  var layerH = (window.innerHeight||720) - 118;
+  var perCol = Math.max(1, Math.floor(layerH/95));
+  var gov = document.createElement('div'); gov.id='grid-overlay'; c.appendChild(gov);
+  var added = 0;
+  function makeIcon(key, label, iconSvg, onClick){
+    var d=document.createElement('div'); d.className='dicon';
+    d.innerHTML='<div class="ic">'+iconSvg+'</div><span>'+label+'</span>';
+    var p=(pos[key] && typeof pos[key].x==='number') ? pos[key] : null;
+    if (!p){ p={x:10+Math.floor(added/perCol)*94, y:10+(added%perCol)*95}; }
+    added++;
+    d.style.left=p.x+'px'; d.style.top=p.y+'px';
+    var down=null, held=false, hold=null;
+    d.addEventListener('pointerdown', function(e){
+      down={sx:e.clientX, sy:e.clientY, lx:p.x, ly:p.y}; held=false;
+      hold=setTimeout(function(){
+        hold=null; held=true;
+        d.classList.add('held');
+        gov.style.display='block';
+      }, 400);
+      try { d.setPointerCapture(e.pointerId); } catch(er){}
+      e.preventDefault();
+    });
+    d.addEventListener('pointermove', function(e){
+      if (!down) return;
+      if (!held){
+        if (Math.abs(e.clientX-down.sx)>12 || Math.abs(e.clientY-down.sy)>12){
+          if (hold){ clearTimeout(hold); hold=null; }
+          down=null;
+        }
+        return;
+      }
+      p.x=clampN(down.lx+(e.clientX-down.sx), 0, window.innerWidth-92);
+      p.y=clampN(down.ly+(e.clientY-down.sy), 0, window.innerHeight-150);
+      d.style.left=p.x+'px'; d.style.top=p.y+'px';
+    });
+    d.addEventListener('pointerup', function(){
+      if (hold){ clearTimeout(hold); hold=null; }
+      gov.style.display='none';
+      d.classList.remove('held');
+      if (down && held){
+        p.x=Math.max(10, Math.min(Math.round((p.x-10)/94)*94+10, window.innerWidth-92));
+        p.y=Math.max(10, Math.min(Math.round((p.y-10)/95)*95+10, window.innerHeight-150));
+        d.style.left=p.x+'px'; d.style.top=p.y+'px';
+        pos[key]={x:p.x,y:p.y};
+        lsSet('zikos_icons', JSON.stringify(pos));
+      } else if (down && !held){
+        onClick();
+      }
+      down=null;
+    });
+    c.appendChild(d);
+  }
+  APPS.forEach(function(a){ if (!a.hidden) makeIcon(a.id, a.title, a.icon, function(){ openApp(a.id); }); });
+  installedApps().forEach(function(a){ makeIcon('user:'+a.path, esc(a.name), IC.apps, function(){ openApp('runapp', a.path); }); });
+}function tick(){
+  var d=new Date();
+  var wd=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][ (d.getDay()+6)%7 ];
+  function p2(n){ return (n<10?'0':'')+n; }
+  $('#clock').textContent = wd+' '+p2(d.getDate())+'.'+p2(d.getMonth()+1)+'  '+p2(d.getHours())+':'+p2(d.getMinutes());
+}
+
+// ---------- диалоги, тост, контекстное меню ----------
+var toastT=null;
+function toast(msg){ var t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(function(){ t.classList.remove('show'); },1800); }
+function askText(title, initial){
+  return new Promise(function(res){
+    var w=$('#dlg-wrap'); w.classList.remove('hidden');
+    w.innerHTML='<div class="dlg"><h4></h4><input><div class="acts"><button class="cancel">Отмена</button><button class="ok">ОК</button></div></div>';
+    w.querySelector('h4').textContent=title;
+    var i=w.querySelector('input'); i.value=initial||''; setTimeout(function(){ i.focus(); }, 60);
+    function done(v){ w.classList.add('hidden'); res(v); }
+    w.querySelector('.cancel').onclick=function(){ done(null); };
+    w.querySelector('.ok').onclick=function(){ done(i.value); };
+    i.onkeydown=function(e){ if(e.key==='Enter') done(i.value); };
+  });
+}
+function confirmDlg(title){
+  return new Promise(function(res){
+    var w=$('#dlg-wrap'); w.classList.remove('hidden');
+    w.innerHTML='<div class="dlg"><h4></h4><div class="acts"><button class="cancel">Отмена</button><button class="ok">Да</button></div></div>';
+    w.querySelector('h4').textContent=title;
+    function done(v){ w.classList.add('hidden'); res(v); }
+    w.querySelector('.cancel').onclick=function(){ done(false); };
+    w.querySelector('.ok').onclick=function(){ done(true); };
+  });
+}
+function openCtx(x, y, name, path){
+  var c=$('#ctx');
+  c.innerHTML='<button data-a="ren">'+IC.rename+'Переименовать</button>'
+   +'<button data-a="open">'+IC.code+'Открыть в «Код»</button>'
+   +'<button data-a="del" class="danger">'+IC.trash+'Удалить</button>';
+  c.style.left = clampN(x, 4, window.innerWidth-190)+'px';
+  c.style.top = clampN(y, 4, window.innerHeight-170)+'px';
+  c.classList.remove('hidden');
+  c.querySelectorAll('button').forEach(function(b){
+    b.onclick = function(){
+      c.classList.add('hidden');
+      var a = b.getAttribute('data-a');
+      if (a==='ren'){
+        askText('Переименовать', name).then(function(nn){
+          if(!nn || !nn.trim()) return;
+          var target = parentOf(path)? parentOf(path)+'/'+nn.trim() : nn.trim();
+          fsRename(path, target); refreshFiles(); toast('Переименовано');
+        });
+      } else if (a==='open'){ openApp('code', path); }
+      else if (a==='del'){
+        confirmDlg('Удалить «'+name+'»?').then(function(ok){ if(ok){ fsDelete(path); refreshFiles(); toast('Удалено'); } });
+      }
+    };
+  });
+}
+
+// ---------- подсветка синтаксиса ----------
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+var KEYWORDS = {
+  js:['const','let','var','function','return','if','else','for','while','class','new','await','async','import','export','true','false','null','this','typeof','of','in'],
+  py:['def','return','if','elif','else','for','while','class','import','from','True','False','None','lambda','try','except','with','as','in','not','and','or','print','range'],
+  dart:['void','var','final','const','class','return','if','else','for','while','new','import','this','true','false','null','static','await','async','super','extends','implements'],
+  css:['color','background','margin','padding','border','font','display','width','height','position','top','left','right','bottom','flex']
+};
+function hl(src, lang){
+  var kw = KEYWORDS[lang]||[];
+  var cmt = { js:'\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/', dart:'\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/', json:'\\/\\/[^\\n]*', py:'#[^\\n]*', css:'\\/\\*[\\s\\S]*?\\*\\/', html:'<!--[\\s\\S]*?-->' }[lang]||'';
+  var re;
+  try {
+    re = new RegExp((cmt?'('+cmt+')|':'')+'("(?:[^"\\\\\\n]|\\\\.)*")'+"|('(?:[^'\\\\\\n]|\\\\.)*')"+'|\\b(\\d+(?:\\.\\d+)?)\\b'+(kw.length?'|\\b('+kw.join('|')+')\\b':''), 'g');
+  } catch(e){ return esc(src); }
+  var out='', last=0, m;
+  while ((m = re.exec(src))){
+    if (m.index>last) out += esc(src.slice(last, m.index));
+    var cls='k';
+    if (m[1]) cls='c'; else if (m[2]||m[3]) cls='s'; else if (m[4]) cls='n';
+    out += '<span class="'+cls+'">'+esc(m[0])+'</span>';
+    last = m.index + m[0].length;
+    if (!m[0].length) re.lastIndex++;
+  }
+  out += esc(src.slice(last));
+  return out;
+}
+
+// ---------- терминал ----------
+function renderTerminal(root){
+  root.innerHTML='<div class="term"><div class="t-out"></div><div class="t-in"><span class="t-ps"></span><input class="t-i" spellcheck="false" autocomplete="off" autocapitalize="off"></div></div>';
+  var out=root.querySelector('.t-out'), ps=root.querySelector('.t-ps'), inp=root.querySelector('.t-i');
+  var cwd='', cmdMode=false;
+  function setPs(){ if (cmdMode){ ps.textContent='C:\\HikariOS'+(cwd?'\\'+cwd.replace(/\//g,'\\'):'')+'>'; } else { ps.textContent='zik@zikos:'+(cwd||'~')+'$ '; } }
+  setPs();
+  out.textContent='HikariOS Terminal 1.0.0 — введите help для списка команд.\n\n';
+  root.querySelector('.term').addEventListener('click', function(){ inp.focus(); });
+  function scrollBottom(){ out.scrollTop = out.scrollHeight; }
+  function abs(p){ p=(p||'').trim(); if(!p) return cwd;
+    if(p.indexOf('/home')===0) return norm(p.slice(5));
+    if(p.charAt(0)==='~') return norm(p.slice(1));
+    if(p.charAt(0)==='/') return norm(p);
+    return norm(cwd? cwd+'/'+p : p); }
+  function tree(dir, depth, max){
+    var items = fsList(dir);
+    for (var i=0;i<items.length;i++){ var it=items[i];
+      out.textContent += '  '.repeat(depth)+it.name+(it.dir?'/':'')+'\n';
+      if (it.dir && depth<max) tree(dir? dir+'/'+it.name : it.name, depth+1, max);
+    }
+  }
+  inp.addEventListener('keydown', function(e){
+    if (e.key!=='Enter') return;
+    var raw = inp.value; inp.value='';
+    out.textContent += ps.textContent+raw+'\n';
+    var parts = raw.trim().split(/\s+/), cmd = parts[0], args = parts.slice(1);
+    if (!cmd){ scrollBottom(); return; }
+    switch(cmd){
+      case 'cmd':
+        cmdMode=true; setPs();
+        out.textContent+='Microsoft Windows [Версия 10.0.1027]\n(c) Корпорация Майкрософт. HikariOS Edition.\n\n'; break;
+      case 'exit':
+        if (cmdMode){ cmdMode=false; setPs(); } else out.textContent+='Закройте окно крестиком.\n'; break;
+      case 'grep': {
+        if (!args.length){ out.textContent+='grep: укажите что искать\n'; break; }
+        var pat=args[0], base=args[1]? abs(args[1]) : null, hits=0;
+        outer_grep:
+        for (var gk in fs){
+          if (!fs[gk] || fs[gk].t!=='f') continue;
+          if (base){ if (gk!==base && gk.indexOf(base+'/')!==0) continue; }
+          var gl=fs[gk].c.split('\n');
+          for (var gi=0; gi<gl.length; gi++) if (gl[gi].indexOf(pat)>=0){
+            out.textContent += gk+':'+(gi+1)+': '+gl[gi].trim().slice(0,120)+'\n';
+            hits++; if (hits>200){ out.textContent+='...слишком много совпадений\n'; break outer_grep; }
+          }
+        }
+        if (!hits) out.textContent+='ничего не найдено\n';
+        break; }
+      case 'edit': {
+        if (!args.length){ out.textContent+='edit: укажите файл\n'; break; }
+        var ep=abs(args[0]);
+        if (fs[ep] && fs[ep].t==='f') openApp('code', ep); else out.textContent+='edit: файл не найден: '+args[0]+'\n';
+        break; }
+      case 'run': {
+        if (!args.length){ out.textContent+='run: укажите html-файл, например run projects/моя игра/index.html\n'; break; }
+        var rp=abs(args[0]);
+        if (fs[rp] && fs[rp].t==='f' && /\.html?$/i.test(rp)) openApp('runapp', rp);
+        else out.textContent+='run: html-файл не найден: '+args[0]+'\n';
+        break; }
+      case 'install': {
+        if (!args.length){ out.textContent+='install: укажите html-файл\n'; break; }
+        var iap=abs(args[0]);
+        if (fs[iap] && fs[iap].t==='f' && /\.html?$/i.test(iap)){ installApp(iap); }
+        else out.textContent+='install: html-файл не найден: '+args[0]+'\n';
+        break; }
+      case 'fullscreen':
+        settings.fs = !(settings.fs!==false);
+        saveSettings(); applySettings();
+        out.textContent += (settings.fs? 'Полноэкранный режим включён':'Полноэкранный режим выключен')+'\n';
+        break;
+      case 'help':
+        out.textContent+='Доступные команды:\n  ls, cd, pwd, cat, mkdir, touch, rm, tree — файлы\n  echo, clear, date, whoami, uname, neofetch, uptime\n  open <files|terminal|code|converter|notes|grok|mypc|browser|settings>\n  cmd — режим командной строки как на ПК, exit — вернуться\n  grep <слово> [папка] — поиск по файлам, edit <файл> — открыть в редакторе\n  install <файл.html> — установить как приложение с ярлыком\n  run <файл.html> — запустить приложение в окне\n'; break;
+      case 'ls': {
+        var t = args.length ? abs(args[0]) : cwd;
+        if (fs[t] && fs[t].t==='f') out.textContent += (args[0]||t)+'\n';
+        else if (!isDir(t)) out.textContent += 'ls: не найдено: '+(args[0]||'.')+'\n';
+        else { var items=fsList(t); out.textContent += items.length ? items.map(function(i){return i.name+(i.dir?'/':'');}).join('   ')+'\n' : '(пусто)\n'; }
+        break; }
+      case 'cd': {
+        if (!args.length){ cwd=''; break; }
+        var t2 = abs(args[0]);
+        if (t2===''||isDir(t2)) cwd=t2; else out.textContent += 'cd: папка не найдена: '+args[0]+'\n';
+        break; }
+      case 'pwd': out.textContent += '/home'+(cwd?'/'+cwd:'')+'\n'; break;
+      case 'cat': {
+        if (!args.length){ out.textContent += 'cat: укажите файл\n'; break; }
+        var t3 = abs(args[0]);
+        if (fs[t3] && fs[t3].t==='f') out.textContent += fs[t3].c+'\n';
+        else out.textContent += 'cat: файл не найден: '+args[0]+'\n';
+        break; }
+      case 'echo': out.textContent += args.join(' ')+'\n'; break;
+      case 'mkdir':
+        if (!args.length) out.textContent += 'mkdir: укажите имя\n'; else fsMkdir(abs(args[0])); break;
+      case 'touch':
+        if (!args.length) out.textContent += 'touch: укажите имя\n';
+        else { var t4=abs(args[0]); if(!fs[t4]) fsWrite(t4,''); }
+        break;
+      case 'rm': {
+        if (args[0]==='-r') args.shift();
+        if (!args.length){ out.textContent += 'rm: укажите путь\n'; break; }
+        var t5 = abs(args[0]);
+        if (t5===''){ out.textContent += 'rm: нельзя удалить /home\n'; break; }
+        if (fs[t5]) fsDelete(t5); else out.textContent += 'rm: не найдено: '+args[0]+'\n';
+        break; }
+      case 'tree': tree(cwd, 0, 2); break;
+      case 'clear': out.textContent=''; break;
+      case 'date': out.textContent += new Date().toString()+'\n'; break;
+      case 'whoami': out.textContent += 'zik\n'; break;
+      case 'uname': out.textContent += 'HikariOS 2.0 zikos-kernel webview\n'; break;
+      case 'uptime': { var s=Math.floor((Date.now()-bootT)/1000); out.textContent += 'up '+Math.floor(s/60)+' мин '+(s%60)+' сек\n'; break; }
+      case 'neofetch':
+        out.textContent += '  #####   ### ###    zik@zikos\n'
+          +'  ##  ##  ### ###    -----------------------\n'
+          +'  ##  ##   ##  ##    OS: HikariOS 2.0 (WebView)\n'
+          +'  #####    ##  ##     Kernel: zikos-web 1.0\n'
+          +'  ##      ### ###    Device: ZIK W1027\n'
+          +'  ##      ### ###    Memory: 2048 MiB\n';
+        break;
+      case 'open': {
+        var a = appById(args[0]);
+        if (a){ openApp(a.id); out.textContent += 'Запуск: '+a.title+'\n'; }
+        else out.textContent += 'open: приложение не найдено: '+(args[0]||'')+'\n';
+        break; }
+      default:
+        out.textContent += 'zsh: команда не найдена: '+cmd+' (введите help)\n';
+    }
+    setPs(); scrollBottom();
+  });
+}
+
+// ---------- файлы ----------
+function renderFiles(root){
+  var st = root._fsState || (root._fsState = {cwd:''});
+  root.innerHTML = '<div class="f-bar">'
+   +'<button id="f-up" title="Вверх">'+IC.up+'</button>'
+   +'<div class="f-crumbs"></div>'
+   +'<button id="f-nf">'+IC.newfolder+'<span>Папка</span></button>'
+   +'<button id="f-nn">'+IC.newfile+'<span>Файл</span></button>'
+   +'</div><div class="f-grid"></div>';
+  var grid = root.querySelector('.f-grid'), crumbs = root.querySelector('.f-crumbs');
+  function extOf(n){ return n.indexOf('.')>=0 ? n.split('.').pop().toLowerCase() : ''; }
+  function iconFor(name, isDir){
+    if (isDir) return '<svg viewBox="0 0 24 24" fill="#F6B73C"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>';
+    var e = extOf(name);
+    if (['html','js','css'].indexOf(e)>=0) return '<svg viewBox="0 0 24 24" fill="#61DAFB"><path d="M9.4 16.6 4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0 4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/></svg>';
+    if (e==='py') return '<svg viewBox="0 0 24 24" fill="#4B8BBE"><path d="M3 4h18c.55 0 1 .45 1 1v14c0 .55-.45 1-1 1H3c-.55 0-1-.45-1-1V5c0-.55.45-1 1-1zm1 3v11h16V7H4zm2.5 2.5L5.3 10.7 7.6 13l-2.3 2.3 1.2 1.2 3.5-3.5-3.5-3.5zM11 14.5h6v1.7h-6v-1.7z"/></svg>';
+    if (e==='json') return '<svg viewBox="0 0 24 24" fill="#CB9C2B"><path d="M8 3c-1.1 0-2 .9-2 2v4c0 1.1-.9 2-2 2H3v2h1c1.1 0 2 .9 2 2v4c0 1.1.9 2 2 2h2v-2H8v-5c0-1.1-.9-2-2-2 1.1 0 2-.9 2-2V5h2V3H8zm8 0c1.1 0 2 .9 2 2v4c0 1.1.9 2 2 2h1v2h-1c-1.1 0-2 .9-2 2v4c0 1.1-.9 2-2 2h-2v-2h2v-5c0-1.1.9-2 2-2-1.1 0-2-.9-2-2V5h-2V3h2z"/></svg>';
+    return '<svg viewBox="0 0 24 24" fill="#8B97A6"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-7V3.5L18.5 9H13z"/></svg>';
+  }
+  function draw(){
+    crumbs.innerHTML='';
+    function add(label, path){ var b=document.createElement('button'); b.textContent=label; b.onclick=function(){ st.cwd=path; draw(); }; crumbs.appendChild(b); }
+    add('/home','');
+    if (st.cwd) st.cwd.split('/').forEach(function(seg, i){ add('/'+seg, st.cwd.split('/').slice(0,i+1).join('/')); });
+    var items = fsList(st.cwd);
+    grid.innerHTML='';
+    if (!items.length){ grid.innerHTML='<div class="f-empty">Папка пуста</div>'; return; }
+    items.forEach(function(it){
+      var path = st.cwd ? st.cwd+'/'+it.name : it.name;
+      var d = document.createElement('div'); d.className='f-item';
+      d.innerHTML = iconFor(it.name, it.dir)+'<div class="nm">'+esc(it.name)+'</div>';
+      var lp=null, moved=false;
+      function clear(){ if(lp){ clearTimeout(lp); lp=null; } }
+      d.addEventListener('pointerdown', function(e){ moved=false; lp=setTimeout(function(){ lp=null; openCtx(e.clientX, e.clientY, it.name, path); }, 550); });
+      d.addEventListener('pointermove', function(){ moved=true; clear(); });
+      d.addEventListener('pointerup', function(){ if(lp){ clear(); if(!moved){ st._open(it, path); } } });
+      d.addEventListener('pointercancel', clear);
+      st._open = function(it2, p){
+        if (it2.dir){ st.cwd = norm(p); draw(); return; }
+        var e2 = extOf(it2.name);
+        if (['txt','md','html','js','css','py','json','dart','xml','yml','yaml','log','sh'].indexOf(e2)>=0) openApp('code', p);
+        else toast('Нет приложения для .'+e2);
+      };
+      grid.appendChild(d);
+    });
+  }
+  root.querySelector('#f-up').onclick = function(){ st.cwd = parentOf(st.cwd); draw(); };
+  root.querySelector('#f-nf').onclick = function(){
+    askText('Новая папка', '').then(function(n){ if(n&&n.trim()){ fsMkdir(norm(st.cwd? st.cwd+'/'+n.trim():n.trim())); draw(); } });
+  };
+  root.querySelector('#f-nn').onclick = function(){
+    askText('Новый файл', '').then(function(n){ if(n&&n.trim()){ fsWrite(norm(st.cwd? st.cwd+'/'+n.trim():n.trim()), ''); draw(); } });
+  };
+  draw();
+}
+
+// ---------- редактор кода (студия) ----------
+function projDir(p){ if(!p) return null; var i=p.lastIndexOf('/'); return i<0? '' : p.slice(0,i); }
+function inlineProj(html, dir){
+  function fp(rel){
+    if (/^https?:/i.test(rel)) return null;
+    return rel[0]==='/' ? rel.slice(1) : (dir? dir+'/'+rel : rel);
+  }
+  html = html.replace(/<link[^>]+href="([^"]+)"[^>]*>/gi, function(m, href){
+    if (!/\.css(\?|$)/i.test(href)) return m;
+    var p=fp(href); if(!p||!fs[p]||fs[p].t!=='f') return m;
+    return '<style>\n'+fs[p].c+'\n</style>';
+  });
+  html = html.replace(/<script[^>]+src="([^"]+)"[^>]*>\s*<\/script>/gi, function(m, src){
+    if (!/\.js(\?|$)/i.test(src)) return m;
+    var p=fp(src); if(!p||!fs[p]||fs[p].t!=='f') return m;
+    return '<script>\n'+fs[p].c.replace(/<\/script>/gi,'<\\/script>')+'\n<\/script>';
+  });
+  return html;
+}
+var TPL_HTML = '<!DOCTYPE html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n<title>Приложение</title>\n<link rel="stylesheet" href="style.css">\n</head>\n<body>\n<div id="app"></div>\n<script src="app.js"><\/script>\n</body>\n</html>';
+var TPL_CSS = 'body { margin:0; background:#0d1117; color:#e6edf3; font-family:sans-serif; }\n#app { padding:16px; }';
+var TPL_JS = '// код приложения\nvar app = document.getElementById(\'app\');\napp.textContent = \'Работает!\';';
+var GEN_BUSY = false;
+function genApp(desc){
+  if (GEN_BUSY){ toast('Генерация уже идёт'); return; }
+  groqInit(function(){
+    if (!GROQ_KEY){ toast('Ключ ИИ не найден'); return; }
+    GEN_BUSY = true; toast('Генерирую приложение...');
+    fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ_KEY},
+      body: JSON.stringify({
+        model: lsGet('zikos_grok_model')||GROQ_DEF,
+        messages: [
+          {role:'system', content:'Ты — генератор одностраничных HTML5-приложений. Пиши ПОЛНЫЙ рабочий HTML-файл: разметка, CSS и JS внутри, тёмная тема, русский интерфейс, адаптив под экран 1280x720, без внешних библиотек, без пояснений. Верни ТОЛЬКО код.'},
+          {role:'user', content: desc}
+        ],
+        temperature: 0.5
+      })
+    }).then(function(r){ return r.json(); }).then(function(j){
+      GEN_BUSY = false;
+      var txt = (j && j.choices && j.choices[0] && j.choices[0].message) ? j.choices[0].message.content : null;
+      if (!txt){ toast('Ошибка генерации'); return; }
+      txt = txt.trim().replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/,'');
+      var name = 'gen-'+(Date.now()%100000);
+      fsMkdir('projects/'+name);
+      fsWrite('projects/'+name+'/index.html', txt);
+      toast('Готово: projects/'+name);
+      openApp('code', 'projects/'+name+'/index.html');
+    }).catch(function(){ GEN_BUSY=false; toast('Сеть недоступна'); });
+  });
+}
+function renderCode(root, path){
+  var st = root._codeState || (root._codeState = {path:null, lang:'txt', preview:false, content:''});
+  if (path){ st.path = norm(path); st.lang = langOf(st.path); st.preview = false; st._prevPath = null; }
+  function langOf(p){ var e=(p||'').split('.').pop().toLowerCase(); return ['html','js','css','py','dart','json'].indexOf(e)>=0 ? e : 'txt'; }
+  var dir = projDir(st.path);
+  var content;
+  if (st.path && fs[st.path] && fs[st.path].t==='f') content = fs[st.path].c;
+  else content = st.content || '';
+  st.content = content;
+  root.innerHTML = '<div class="e-bar"><span class="fn"></span>'
+   +'<select><option value="html">HTML</option><option value="js">JS</option><option value="css">CSS</option><option value="py">Python</option><option value="dart">Dart</option><option value="json">JSON</option><option value="txt">Текст</option></select>'
+   +'<button class="e-find-btn" title="Найти и заменить (Ctrl+F)">Найти</button>'
+   +'<button class="e-new" title="Новый проект из шаблона">Проект</button>'
+   +'<button class="e-gen" title="Сгенерировать приложение по описанию">&#10024;</button>'
+   +'<button class="e-prev-btn">'+(st.preview?'Код':'Превью')+'</button>'
+   +'<button class="e-imp" title="Импортировать с планшета">&#11014;</button>'
+   +'<button class="e-exp" title="Сохранить в Загрузки планшета">&#11015;</button>'
+   +'<button class="e-bld" title="Собрать APK и EXE в облаке">&#128230;</button>'
+   +'<button class="e-save">Сохранить</button></div>'
+   +'<div class="e-tabs"></div>'
+   +'<div class="e-find" style="display:none"><input id="e-q" class="br-url" placeholder="искать..."><span id="e-cnt" style="font-size:11px;color:var(--muted);white-space:nowrap"></span><input id="e-r" class="br-url" placeholder="заменить на..."><button class="chip" id="e-replall">Заменить всё</button></div>'
+   + (st.preview ? '<iframe class="e-prev"></iframe><div class="e-logs" id="e-logs"></div>'
+      : '<div class="ed-wrap"><div class="gutter"></div><div class="code-area"><pre class="hl"></pre><textarea spellcheck="false" autocapitalize="off" autocorrect="off"></textarea></div></div>')
+   +'<div class="e-stat"></div>';
+  var fnEl = root.querySelector('.fn'), stat = root.querySelector('.e-stat'), sel = root.querySelector('select');
+  sel.value = st.lang;
+  var dirty = !!st.dirty;
+  function updateHead(){ fnEl.textContent = (st.path||'Без имени')+(dirty?' *':''); stat.textContent = st.lang.toUpperCase()+' · '+content.split('\n').length+' строк'+(dirty?' · не сохранено':''); }
+  function save(){
+    var p = st.path;
+    if (!p){ askText('Имя файла (в projects/)', 'index.html').then(function(n){ if(!n||!n.trim())return; doSave(norm('projects/'+n.trim())); }); }
+    else doSave(p);
+  }
+  function doSave(p){ fsWrite(p, content); st.content=content; st.path=p; st.lang=langOf(p); sel.value=st.lang; dirty=false; st.dirty=false; updateHead(); toast('Сохранено: '+p); }
+  root.querySelector('.e-save').onclick = save;
+  var tabsEl = root.querySelector('.e-tabs');
+  function drawTabs(){
+    tabsEl.innerHTML='';
+    if (!dir) return;
+    fsList(dir).forEach(function(f){
+      if (f.dir) return;
+      var p = dir+'/'+f.name;
+      var b=document.createElement('button'); b.className='e-tab'+(p===st.path?' on':'');
+      b.textContent=f.name;
+      b.onclick=function(){ openApp('code', p); };
+      tabsEl.appendChild(b);
+    });
+    var plus=document.createElement('button'); plus.className='e-tab'; plus.textContent='+';
+    plus.title='Новый файл в папке';
+    plus.onclick=function(){
+      askText('Новый файл в '+dir, '').then(function(n){
+        if(!n||!n.trim())return;
+        var nn=n.trim(); if (nn.indexOf('.')<0) nn+='.js';
+        fsWrite(dir+'/'+nn, ''); openApp('code', dir+'/'+nn);
+      });
+    };
+    tabsEl.appendChild(plus);
+  }
+  drawTabs();
+  var findEl = root.querySelector('.e-find'), qEl = root.querySelector('#e-q'), rEl = root.querySelector('#e-r'), cntEl = root.querySelector('#e-cnt');
+  root.querySelector('.e-find-btn').onclick = function(){
+    findEl.style.display = (findEl.style.display==='flex') ? 'none' : 'flex';
+    if (findEl.style.display==='flex'){ qEl.focus(); qEl.select(); }
+  };
+  function fCnt(){ var q=qEl.value; if(!q){ cntEl.textContent=''; return 0; } var n=content.split(q).length-1; cntEl.textContent=n+' совп.'; return n; }
+  qEl.addEventListener('input', fCnt);
+  root.querySelector('#e-replall').onclick = function(){
+    var q=qEl.value;
+    if(!q){ toast('Введите что искать'); return; }
+    var n=fCnt();
+    content = content.split(q).join(rEl.value);
+    if (ta) ta.value = content;
+    dirty=true; st.dirty=true;
+    if (ta) paint();
+    toast('Заменено: '+n);
+  };
+  root.querySelector('.e-bld').onclick = function(){ if (!st.path){ toast('Сначала сохрани файл'); return; } startBuild(st.path); };
+  initMsgListener();
+  root.querySelector('.e-new').onclick=function(){
+    askText('Название проекта', '').then(function(n){
+      if(!n||!n.trim())return;
+      var name=n.trim().replace(/[^\wа-яёА-ЯЁ -]/g,'_');
+      var d='projects/'+name, k=2;
+      while (fs[d] && fs[d].t==='d') d='projects/'+name+'-'+(k++);
+      fsMkdir(d);
+      fsWrite(d+'/index.html', TPL_HTML);
+      fsWrite(d+'/style.css', TPL_CSS);
+      fsWrite(d+'/app.js', TPL_JS);
+      openApp('code', d+'/index.html');
+      toast('Проект создан: '+d);
+    });
+  };
+  root.querySelector('.e-gen').onclick=function(){
+    askText('Опиши приложение — сгенерирую код', '').then(function(d){
+      if(d && d.trim()) genApp(d.trim());
+    });
+  };
+  root.querySelector('.e-exp').onclick=function(){
+    var name = st.path ? st.path.split('/').pop() : 'app.html';
+    if (window.zikBridge && zikBridge.saveDownload){
+      zikBridge.saveDownload(name, st.lang==='html'?'text/html':'text/plain', btoa(unescape(encodeURIComponent(content))));
+      toast('Сохранено в Загрузки: '+name);
+    } else {
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([content], {type:'text/html'}));
+      a.download=name; document.body.appendChild(a); a.click(); a.remove();
+    }
+  };
+  root.querySelector('.e-imp').onclick=function(){
+    if (window.zikBridge && zikBridge.importFile){
+      zikBridge.importFile();
+      toast('Выбери файл на планшете');
+      var tries=0;
+      var tm=setInterval(function(){
+        tries++;
+        var got=null;
+        try { got = zikBridge.getPicked(); } catch(e){}
+        if (got){
+          clearInterval(tm);
+          if (got==='__cancel__'){ toast('Импорт отменён'); return; }
+          if (got==='__error__'){ toast('Не удалось прочитать файл'); return; }
+          var nm = st.path ? st.path.split('/').pop() : 'imported.txt';
+          fsMkdir('imports');
+          var p = 'imports/'+nm;
+          fsWrite(p, got);
+          openApp('code', p);
+          toast('Импортировано: '+p);
+        } else if (tries>60){ clearInterval(tm); }
+      }, 500);
+    } else {
+      var fi=document.createElement('input'); fi.type='file';
+      fi.onchange=function(){
+        var f=fi.files[0]; if(!f)return;
+        var rd=new FileReader();
+        rd.onload=function(){ fsMkdir('imports'); var p='imports/'+f.name; fsWrite(p, rd.result); openApp('code', p); toast('Импортировано: '+p); };
+        rd.readAsText(f);
+      };
+      fi.click();
+    }
+  };
+  root.querySelector('.e-prev-btn').onclick = function(){
+    if (!st.preview && st.lang!=='html'){
+      var ip = dir ? dir+'/index.html' : null;
+      if (ip && fs[ip] && fs[ip].t==='f'){ st.preview=true; st._prevPath=ip; renderCode(root, null); return; }
+      toast('Превью доступно для HTML');
+      return;
+    }
+    st.preview = !st.preview;
+    st._prevPath = st.path;
+    renderCode(root, null);
+  };
+  var ta = root.querySelector('textarea');
+  if (ta){
+    var hlEl = root.querySelector('pre.hl'), gut = root.querySelector('.gutter');
+    ta.value = content;
+    function paint(){
+      content = ta.value;
+      st.content = content;
+      hlEl.innerHTML = hl(content, st.lang)+'\n';
+      var n = content.split('\n').length, g='';
+      for (var i=1;i<=n;i++) g += i+'\n';
+      gut.textContent = g;
+      updateHead();
+    }
+    ta.addEventListener('input', function(){ dirty=true; st.dirty=true; paint(); });
+    ta.addEventListener('keydown', function(e){
+      if ((e.ctrlKey||e.metaKey) && (e.key==='s'||e.key==='S')){ e.preventDefault(); save(); }
+      else if ((e.ctrlKey||e.metaKey) && e.key==='Enter'){ e.preventDefault(); root.querySelector('.e-prev-btn').click(); }
+      else if (e.key==='Escape'){ findEl.style.display='none'; }
+    });
+    ta.onscroll = function(){ hlEl.scrollTop=ta.scrollTop; hlEl.scrollLeft=ta.scrollLeft; gut.scrollTop=ta.scrollTop; };
+    paint();
+    ta.focus();
+  } else {
+    var fr = root.querySelector('iframe.e-prev');
+    var pp = st._prevPath || st.path;
+    if (fr && pp && fs[pp] && fs[pp].t==='f') fr.srcdoc = CONSOLE_HOOK + inlineProj(fs[pp].c, projDir(pp));
+    updateHead();
+  }
+}
+// ---------- конвертер ----------
+var UNITS = {
+  'Длина':{'мм':0.001,'см':0.01,'м':1,'км':1000,'дюйм':0.0254,'фут':0.3048,'ярд':0.9144,'миля':1609.344},
+  'Масса':{'г':0.001,'кг':1,'т':1000,'фунт':0.45359237,'унция':0.0283495},
+  'Данные':{'Байт':1,'КБайт':1024,'МБайт':1048576,'ГБайт':1073741824,'ТБайт':1099511627776},
+  'Скорость':{'м/с':1,'км/ч':0.2777778,'миль/ч':0.44704,'узел':0.5144444},
+  'Время':{'сек':1,'мин':60,'час':3600,'день':86400,'неделя':604800},
+  'Температура':{'°C':1,'°F':1,'K':1}
+};
+function fmtNum(x){ if(!isFinite(x)) return '—'; if (Math.abs(x-Math.round(x))<1e-9 && Math.abs(x)<1e12) return String(Math.round(x)); return String(+x.toPrecision(10)); }
+function renderConverter(root){
+  root.innerHTML='<div class="c-tabs">'
+   +'<button data-t="u" class="on">Единицы</button><button data-t="b">Системы счисления</button><button data-t="x">Текст</button><button data-t="t">Время</button>'
+   +'</div><div class="c-body"></div>';
+  var body = root.querySelector('.c-body');
+  var tabs = root.querySelectorAll('.c-tabs button');
+  for (var i=0;i<tabs.length;i++)(function(b){
+    b.addEventListener('click', function(){
+      for (var j=0;j<tabs.length;j++) tabs[j].classList.remove('on');
+      b.classList.add('on');
+      draw(b.getAttribute('data-t'));
+    });
+  })(tabs[i]);
+  function drawUnits(){
+    var cats = Object.keys(UNITS);
+    var cat='Длина', from='м', to='фут';
+    body.innerHTML='<div><label>Категория</label><select id="u-cat">'+cats.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select></div>'
+     +'<div><label>Значение</label><input id="u-val" type="text" inputmode="decimal" value="1"></div>'
+     +'<div class="row2"><div><label>Из</label><select id="u-from"></select></div>'
+     +'<button class="swapbtn" id="u-swap" type="button">⇄</button>'
+     +'<div><label>В</label><select id="u-to"></select></div></div>'
+     +'<div class="c-res"><b id="u-res">—</b><small id="u-sub"></small></div>';
+    var el=function(id){ return body.querySelector('#'+id); };
+    function fillUnits(){ var ks=Object.keys(UNITS[cat]); el('u-from').innerHTML=ks.map(function(k){return '<option>'+k+'</option>';}).join(''); el('u-to').innerHTML=ks.map(function(k){return '<option>'+k+'</option>';}).join(''); el('u-from').value=from; el('u-to').value=to; }
+    function calc(){
+      var v = parseFloat((el('u-val').value||'').replace(',','.'));
+      if (isNaN(v)){ el('u-res').textContent='—'; return; }
+      var r;
+      if (cat==='Температура'){
+        var c; if(from==='°C')c=v; else if(from==='°F')c=(v-32)/1.8; else c=v-273.15;
+        if(to==='°C')r=c; else if(to==='°F')r=c*1.8+32; else r=c+273.15;
+      } else r = v*UNITS[cat][from]/UNITS[cat][to];
+      el('u-res').textContent = fmtNum(r);
+      el('u-sub').textContent = from+' → '+to;
+    }
+    el('u-cat').addEventListener('change', function(e){ cat=e.target.value; var ks=Object.keys(UNITS[cat]); from=ks[0]; to=ks[1]||ks[0]; fillUnits(); calc(); });
+    el('u-val').addEventListener('input', calc);
+    el('u-from').addEventListener('change', function(e){ from=e.target.value; calc(); });
+    el('u-to').addEventListener('change', function(e){ to=e.target.value; calc(); });
+    el('u-swap').addEventListener('click', function(){ var t=from; from=to; to=t; el('u-from').value=from; el('u-to').value=to; calc(); });
+    fillUnits(); calc();
+  }
+  function drawBases(){
+    body.innerHTML='<div><label>Число</label><input id="b-in" value="255" inputmode="numeric"></div>'
+     +'<div><label>Система ввода</label><select id="b-base"><option value="2">BIN (2)</option><option value="8">OCT (8)</option><option value="10" selected>DEC (10)</option><option value="16">HEX (16)</option></select></div>'
+     +'<div class="c-res" id="b-cards" style="text-align:left"></div>';
+    function calc(){
+      var t = body.querySelector('#b-in').value.trim();
+      var b = parseInt(body.querySelector('#b-base').value, 10);
+      var n = parseInt(t, b);
+      var ok = !isNaN(n) && t!=='';
+      var html='';
+      var defs=[[2,'BIN'],[8,'OCT'],[10,'DEC'],[16,'HEX']];
+      for (var i=0;i<defs.length;i++){ var d=defs[i];
+        html += '<div style="display:flex;gap:10px;padding:9px 2px;border-bottom:1px solid var(--outline);font-size:14px"><b style="width:44px;color:var(--accent)">'+d[1]+'</b><span style="font-family:monospace;word-break:break-all">'+(ok? n.toString(d[0]).toUpperCase() : '—')+'</span></div>';
+      }
+      body.querySelector('#b-cards').innerHTML = html;
+    }
+    body.querySelector('#b-in').addEventListener('input', calc);
+    body.querySelector('#b-base').addEventListener('change', calc);
+    calc();
+  }
+  function drawText(){
+    body.innerHTML='<label>Ввод</label><textarea id="x-in" class="ta" placeholder="Текст..."></textarea>'
+     +'<div class="chiprow">'
+     +'<button class="chip" data-a="b64e">Base64 ↗</button><button class="chip" data-a="b64d">Base64 ↘</button>'
+     +'<button class="chip" data-a="urle">URL ↗</button><button class="chip" data-a="urld">URL ↘</button>'
+     +'<button class="chip" data-a="up">ВЕРХНИЙ</button><button class="chip" data-a="low">нижний</button>'
+     +'<button class="chip" data-a="rev">Реверс</button></div>'
+     +'<label>Результат</label><textarea id="x-out" class="ta" readonly></textarea>'
+     +'<button class="chip" id="x-copy">Копировать</button>';
+    var chips = body.querySelectorAll('.chip[data-a]');
+    for (var i=0;i<chips.length;i++)(function(ch){
+      ch.addEventListener('click', function(){
+        var s = body.querySelector('#x-in').value, a = ch.getAttribute('data-a'), r;
+        try {
+          if (a==='b64e') r = btoa(unescape(encodeURIComponent(s)));
+          else if (a==='b64d') r = decodeURIComponent(escape(atob(s.trim())));
+          else if (a==='urle') r = encodeURIComponent(s);
+          else if (a==='urld') r = decodeURIComponent(s);
+          else if (a==='up') r = s.toUpperCase();
+          else if (a==='low') r = s.toLowerCase();
+          else r = s.split('').reverse().join('');
+        } catch(e){ r = 'Ошибка: некорректный ввод'; }
+        body.querySelector('#x-out').value = r;
+      });
+    })(chips[i]);
+    body.querySelector('#x-copy').addEventListener('click', function(){
+      body.querySelector('#x-out').select(); try{ document.execCommand('copy'); }catch(e){}
+      toast('Скопировано');
+    });
+  }
+  function drawTime(){
+    body.innerHTML='<div class="c-res" style="text-align:left"><label>Метка времени → Дата</label><input id="t-ts" inputmode="numeric" placeholder="1760851200"><b id="t-r1" style="margin-top:10px">—</b></div>'
+     +'<div class="c-res" style="text-align:left"><label>Дата → Метка времени</label><input id="t-dt" placeholder="2026-10-21 06:00"><b id="t-r2" style="margin-top:10px">—</b></div>';
+    function p2(n){ return (n<10?'0':'')+n; }
+    body.querySelector('#t-ts').addEventListener('input', function(){
+      var t = parseInt(this.value.trim(), 10);
+      if (isNaN(t)){ body.querySelector('#t-r1').textContent='—'; return; }
+      var d = new Date(Math.abs(t)>1e11 ? t : t*1000);
+      body.querySelector('#t-r1').textContent = p2(d.getDate())+'.'+p2(d.getMonth()+1)+'.'+d.getFullYear()+' '+p2(d.getHours())+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());
+    });
+    body.querySelector('#t-dt').addEventListener('input', function(){
+      var s = this.value.trim().replace(' ', 'T');
+      var d = new Date(s);
+      if (isNaN(d.getTime())){ body.querySelector('#t-r2').textContent='—'; return; }
+      body.querySelector('#t-r2').textContent = String(Math.floor(d.getTime()/1000));
+    });
+  }
+  var drawFns = {u:drawUnits, b:drawBases, x:drawText, t:drawTime};
+  function draw(t){ drawFns[t](); }
+  drawUnits();
+}
+
+// ---------- настройки ----------
+function renderSettings(root){
+  root.innerHTML='<div class="s-list">'
+   +'<div class="s-card"><h3>Обои</h3><div class="swatches" id="s-wp"></div></div>'
+   +'<div class="s-card"><h3>Акцентный цвет</h3><div class="swatches" id="s-acc"></div></div>'
+   +'<div class="s-card"><h3>Оформление</h3><div class="tgl-row"><span>Тёмная тема</span><div class="tgl" id="s-dark"></div></div></div>'
+   +'<div class="s-card"><h3>О системе</h3>'
+   +'<div class="kv"><span>ОС</span>HikariOS 2.0 (WebView Edition)</div>'
+   +'<div class="kv"><span>Устройство</span>ZIK W1027</div>'
+   +'<div class="kv"><span>Пользователь</span>zik</div>'
+   +'<div class="kv"><span>Движок</span>Chromium WebView</div>'
+   +'<div class="kv"><span>Хранилище</span>localStorage · /home</div>'
+   +'</div>'
+   +'<div style="text-align:center;color:var(--muted);font-style:italic;font-size:12px">Собрано специально для БИМ</div></div>';
+  var wp = root.querySelector('#s-wp');
+  WALLS.forEach(function(w, i){
+    var d=document.createElement('div'); d.className='wp-sw'+(settings.wallpaper===i?' on':'');
+    d.style.background=w.css; d.title=w.name;
+    d.onclick=function(){ settings.wallpaper=i; saveSettings(); renderSettings(root); };
+    wp.appendChild(d);
+  });
+  var ac = root.querySelector('#s-acc');
+  ACCENTS.forEach(function(c, i){
+    var d=document.createElement('div'); d.className='acc-sw'+(settings.accent===i?' on':'');
+    d.style.background=c;
+    d.onclick=function(){ settings.accent=i; saveSettings(); renderSettings(root); };
+    ac.appendChild(d);
+  });
+  var dk = root.querySelector('#s-dark');
+  dk.classList.toggle('on', settings.dark);
+  dk.onclick=function(){ settings.dark=!settings.dark; saveSettings(); dk.classList.toggle('on', settings.dark); };
+}
+
+// ---------- блокнот ----------
+function fmtDate(d){ function p2(n){ return (n<10?'0':'')+n; } return p2(d.getDate())+'.'+p2(d.getMonth()+1)+' '+p2(d.getHours())+':'+p2(d.getMinutes()); }
+function loadNotes(){
+  var raw = lsGet('zikos_notes');
+  if (raw === null){
+    var seed = [{ text:'Привет! Это Блокнот HikariOS.\nЗаметки хранятся прямо на устройстве и переживают перезапуск.\nКнопка «В файл» копирует заметку в /home/notes/, откуда её видно в Терминале, Файлах и Коде.\n', updated: fmtDate(new Date()) }];
+    lsSet('zikos_notes', JSON.stringify(seed));
+    return seed;
+  }
+  try { return JSON.parse(raw) || []; } catch(e){ return []; }
+}
+function saveNotes(n){ lsSet('zikos_notes', JSON.stringify(n)); }
+function renderNotes(root){
+  var st = root._notesState || (root._notesState = {cur:null});
+  var notes = loadNotes();
+  root.innerHTML = '<div style="display:flex;flex:1;overflow:hidden">'
+   +'<div class="n-list"><button class="chip" id="n-new">+ Новая</button><div id="n-items"></div></div>'
+   +'<div class="n-edit"><div class="n-head"><span id="n-title">Выберите заметку</span><button class="chip" id="n-tofile">В файл</button></div>'
+   +'<textarea id="n-text" class="ta" placeholder="Текст заметки..." disabled></textarea></div></div>';
+  var items = root.querySelector('#n-items'), ta = root.querySelector('#n-text'), titleEl = root.querySelector('#n-title');
+  function titleOf(n){ var t=(n.text||'').split('\n')[0].trim(); return t ? t.slice(0,26) : 'Без названия'; }
+  function drawList(){
+    items.innerHTML='';
+    if (!notes.length){ items.innerHTML='<div style="color:var(--muted);font-size:12px;padding:12px 4px">Заметок нет</div>'; return; }
+    notes.forEach(function(n, i){
+      var d=document.createElement('div'); d.className='n-item'+(st.cur===i?' on':'');
+      d.innerHTML='<div class="n-t">'+esc(titleOf(n))+'</div><div class="n-d">'+fmtDate(new Date(n.updated||new Date()))+'</div>';
+      if (n.updated) d.querySelector('.n-d').textContent = n.updated;
+      d.addEventListener('click', function(){ open(i); });
+      var x=document.createElement('button'); x.className='n-x'; x.textContent='\u00d7';
+      x.addEventListener('click', function(e){
+        e.stopPropagation();
+        notes.splice(i,1);
+        if (st.cur===i) st.cur=null; else if (st.cur>i) st.cur--;
+        saveNotes(notes); drawList();
+        if (st.cur!=null && notes[st.cur]) open(st.cur);
+        else { ta.value=''; ta.disabled=true; titleEl.textContent='Выберите заметку'; }
+      });
+      d.appendChild(x);
+      items.appendChild(d);
+    });
+  }
+  function open(i){
+    st.cur=i; var n=notes[i];
+    ta.value=n.text||''; ta.disabled=false;
+    titleEl.textContent=titleOf(n);
+    drawList(); ta.focus();
+  }
+  root.querySelector('#n-new').addEventListener('click', function(){
+    notes.unshift({text:'', updated: fmtDate(new Date())});
+    saveNotes(notes); open(0);
+  });
+  root.querySelector('#n-tofile').addEventListener('click', function(){
+    if (st.cur==null){ toast('Сначала выберите заметку'); return; }
+    var n=notes[st.cur];
+    var name=(titleOf(n).replace(/[\\/:*?"<>|]/g,'_').slice(0,20))||'note';
+    var t=(n.text||'');
+    var isHtml = /^\s*(<!doctype\s+html|<html|<head|<body)/i.test(t) || (/<body[\s>]/i.test(t) && /<\/body>/i.test(t));
+    var p='notes/'+name+(isHtml ? '.html' : '.txt');
+    if (fs[p]) p='notes/'+name+'-'+(Date.now()%10000)+'.txt';
+    fsWrite(p, n.text||'');
+    toast('Сохранено: '+p);
+  });
+  ta.addEventListener('input', function(){
+    if (st.cur==null) return;
+    notes[st.cur].text = ta.value;
+    notes[st.cur].updated = fmtDate(new Date());
+    titleEl.textContent = titleOf(notes[st.cur]);
+    saveNotes(notes); drawList();
+  });
+  if (st.cur!=null && notes[st.cur]) open(st.cur); else drawList();
+}
+
+// ---------- ИИ-чат (Grok/Groq) ----------
+var GROQ_KEY = null;
+var GROQ_DEF = 'openai/gpt-oss-120b';
+var GROQ_MODELS = ['openai/gpt-oss-120b','openai/gpt-oss-20b','qwen/qwen3.8-27b'];
+function groqInit(cb){
+  if (GROQ_KEY !== null) return cb();
+  try {
+    var x = new XMLHttpRequest();
+    x.open('GET', 'grok.json', true);
+    x.onload = function(){ var j={}; try { j=JSON.parse(x.responseText); } catch(e){} GROQ_KEY=(j && j.key)? j.key : ''; cb(); };
+    x.onerror = function(){ GROQ_KEY=''; cb(); };
+    x.send();
+  } catch(e){ GROQ_KEY=''; cb(); }
+}
+function renderGrok(root){
+  var st = root._grokState || (root._grokState = {msgs:null, busy:false});
+  var model = lsGet('zikos_grok_model') || GROQ_DEF;
+  if (!st.msgs){ try { st.msgs = JSON.parse(lsGet('zikos_grok_chat')) || []; } catch(e){ st.msgs = []; } }
+  root.innerHTML = '<div class="g-bar"><select id="gr-model"></select><button class="chip" id="gr-clear">Очистить</button><span style="flex:1"></span><span id="gr-st" style="font-size:11px;color:var(--muted)">ИИ-чат · Groq</span></div>'
+   +'<div class="g-msgs" id="gr-msgs"></div>'
+   +'<div class="g-in"><textarea id="gr-text" class="ta" placeholder="Попроси написать код, функцию, скрипт... (Enter — отправить)"></textarea><button id="gr-send">&#9654;</button></div>';
+  var msgs = root.querySelector('#gr-msgs'), ta = root.querySelector('#gr-text'), sel = root.querySelector('#gr-model'), stat = root.querySelector('#gr-st');
+  function saveChat(){ lsSet('zikos_grok_chat', JSON.stringify(st.msgs)); }
+  function extOf(lang){ var m={javascript:'js',js:'js',html:'html',css:'css',python:'py',py:'py',dart:'dart',java:'java',json:'json',bash:'sh',sh:'sh',shell:'sh',typescript:'ts',ts:'ts',kotlin:'kt',sql:'sql',c:'c',cpp:'cpp',csharp:'cs'}; return m[(lang||'').toLowerCase()]||'txt'; }
+  function addMsg(m){
+    var d = document.createElement('div');
+    d.className = 'g-m ' + (m.role==='user' ? 'user' : (m.role==='err' ? 'err' : 'bot'));
+    var parts = String(m.content||'').split('```');
+    var html = (m.role==='bot' ? '<span class="g-name">ИИ</span>' : '');
+    var blocks = [];
+    for (var i=0;i<parts.length;i++){
+      if (i%2===1){
+        var seg = parts[i];
+        var nl = seg.indexOf('\n');
+        var lang = nl>=0 ? seg.slice(0,nl).trim().toLowerCase() : '';
+        var code = nl>=0 ? seg.slice(nl+1) : seg;
+        if (lang && !/^[a-z0-9+#-]{1,12}$/.test(lang)) { code = seg; lang = ''; }
+        blocks.push({lang:lang, code:code});
+        html += '<pre class="g-code">'+esc(code)+'</pre>';
+      } else { html += esc(parts[i]); }
+    }
+    d.innerHTML = html;
+    if (m.role!=='user' && m.role!=='err' && blocks.length){
+      blocks.forEach(function(b){
+        var btn = document.createElement('button'); btn.className='g-tocode';
+        btn.textContent = '\u2192 В редактор ('+(b.lang||'txt')+')';
+        btn.addEventListener('click', function(){
+          var p = 'grok/grok-'+(Date.now()%100000)+'.'+extOf(b.lang);
+          fsWrite(p, b.code); openApp('code', p); toast('Открыто в редакторе: '+p);
+        });
+        d.appendChild(btn);
+      });
+    }
+    msgs.appendChild(d); msgs.scrollTop = msgs.scrollHeight;
+  }
+  function drawAll(){ msgs.innerHTML=''; for (var i=0;i<st.msgs.length;i++) addMsg(st.msgs[i]); }
+  function send(){
+    var t = ta.value.trim();
+    if (!t || st.busy) return;
+    if (GROQ_KEY === null){ groqInit(send); return; }
+    if (!GROQ_KEY){ st.msgs.push({role:'err', content:'Ключ не найден в этой сборке. Соберите APK с секретом GROQ_API_KEY или проверьте сборку.'}); drawAll(); return; }
+    ta.value='';
+    st.msgs.push({role:'user', content:t});
+    var hist = st.msgs.slice(-12).map(function(m){ return {role:(m.role==='user'?'user':'assistant'), content:m.content}; });
+    st.msgs.push({role:'bot', content:'...думает...'});
+    var thinkIdx = st.msgs.length-1;
+    drawAll(); st.busy = true; stat.textContent = 'запрос...';
+    fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ_KEY},
+      body: JSON.stringify({model:model, messages:hist, temperature:0.4})
+    }).then(function(r){ return r.json().then(function(j){ return {ok:r.ok, j:j}; }); }).then(function(res){
+      st.busy = false;
+      var txt = (res.j && res.j.choices && res.j.choices[0] && res.j.choices[0].message && res.j.choices[0].message.content) || null;
+      if (res.ok && txt){ st.msgs[thinkIdx] = {role:'bot', content:txt}; stat.textContent='готово'; }
+      else { st.msgs[thinkIdx] = {role:'err', content:'Ошибка API: '+JSON.stringify(res.j).slice(0,300)}; stat.textContent='ошибка API'; }
+      saveChat(); drawAll();
+    }).catch(function(e){
+      st.busy=false; st.msgs[thinkIdx]={role:'err', content:'Сеть недоступна: '+e}; stat.textContent='нет сети'; saveChat(); drawAll();
+    });
+    saveChat();
+  }
+  function fillModels(extra){
+    var ids = GROQ_MODELS.concat(extra||[]);
+    var seen={}; ids = ids.filter(function(x){ if(seen[x]) return false; seen[x]=1; return true; });
+    sel.innerHTML = ids.map(function(m){ return '<option>'+esc(m)+'</option>'; }).join('');
+    if (ids.indexOf(model)<0) model = ids[0];
+    sel.value = model;
+  }
+  fillModels();
+  sel.addEventListener('change', function(){ model = sel.value; lsSet('zikos_grok_model', model); });
+  root.querySelector('#gr-clear').addEventListener('click', function(){ st.msgs=[]; saveChat(); drawAll(); });
+  root.querySelector('#gr-send').addEventListener('click', send);
+  ta.addEventListener('keydown', function(e){ if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
+  drawAll();
+  groqInit(function(){
+    if (GROQ_KEY){
+      stat.textContent = 'подключено';
+      fetch('https://api.groq.com/openai/v1/models', {headers:{'Authorization':'Bearer '+GROQ_KEY}})
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          var ids = (j.data||[]).map(function(m){ return m.id; }).filter(function(id){ return id && id.indexOf('whisper')<0 && id.indexOf('orpheus')<0 && id.indexOf('guard')<0; });
+          fillModels(ids);
+        }).catch(function(){});
+    } else { stat.textContent = 'ключ не найден'; }
+  });
+  ta.focus();
+}
+
+// ---------- мой компьютер ----------
+function fmtBytes(b){ if (b===undefined||b===null||b<0) return '\u2014'; var u=['\u0411','\u041a\u0411','\u041c\u0411','\u0413\u0411','\u0422\u0411']; var i=0; while(b>=1024&&i<u.length-1){ b/=1024; i++; } return (b>=100? Math.round(b) : Math.round(b*10)/10)+' '+u[i]; }
+function renderSys(root){
+  root.innerHTML = '<div style="flex:1;overflow-y:auto">'
+   +'<div class="pc-head"><div class="big">'+IC.mypc+'</div><div><h3 id="pc-name">Мой компьютер</h3><small>HikariOS 1.0 \u00b7 WebView Edition</small></div></div>'
+   +'<div class="pc-grid" id="pc-grid"></div>'
+   +'<div style="padding:0 14px 14px"><button class="chip" id="pc-refresh">Обновить</button></div></div>';
+  var grid = root.querySelector('#pc-grid');
+  function kv(k,v){ return '<div class="pc-kv"><span>'+k+'</span><b>'+v+'</b></div>'; }
+  function card(title, inner){ return '<div class="s-card pc-card"><h4>'+title+'</h4>'+inner+'</div>'; }
+  function draw(d){
+    var ramPct = (d.ramTotal>0 && d.ramAvail>0) ? Math.round(100*(1 - d.ramAvail/d.ramTotal)) : 0;
+    var stPct = d.storageTotal>0 ? Math.round(100*(1 - d.storageAvail/d.storageTotal)) : 0;
+    var used = (d.storageTotal||0) - (d.storageAvail||0);
+    grid.innerHTML =
+      card('\u0423\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u043e', kv('Модель', d.model||'\u2014')+kv('Производитель', d.manufacturer||'\u2014')+kv('Платформа', d.board||'\u2014'))
+    + card('\u0421\u0438\u0441\u0442\u0435\u043c\u0430', kv('Android', d.android||'\u2014')+kv('SDK', d.sdk!==undefined? d.sdk : '\u2014')+kv('HikariOS', '1.0 (WebView)')+kv('Процессор', (d.cores||'?')+' ядер'))
+    + card('\u041f\u0430\u043c\u044f\u0442\u044c', kv('Всего', fmtBytes(d.ramTotal))+kv('Свободно', fmtBytes(d.ramAvail))+kv('Занято', d.ramAvail>0? ramPct+'%' : '\u2014')+(d.ramAvail>0? '<div class="bar2"><i style="width:'+ramPct+'%"></i></div>' : '')+(d.heap? kv('Куча JS', fmtBytes(d.heap)) : ''))
+    + card('\u0425\u0440\u0430\u043d\u0438\u043b\u0438\u0449\u0435', kv('Всего', fmtBytes(d.storageTotal))+kv('Занято', fmtBytes(used))+'<div class="bar2"><i style="width:'+stPct+'%"></i></div>'+kv('Свободно', fmtBytes(d.storageAvail)))
+    + card('\u0411\u0430\u0442\u0430\u0440\u0435\u044f', kv('Заряд', (d.battery!==undefined&&d.battery>=0)? d.battery+'%' : '\u2014')+kv('Статус', d.charging? 'заряжается' : 'от батареи')+(d.temp>=0? kv('Температура', d.temp+' \u00b0C') : '')+(d.voltage>0? kv('Напряжение', (d.voltage/1000).toFixed(2)+' В') : ''))
+    + card('\u042d\u043a\u0440\u0430\u043d', kv('Разрешение', screen.width+'\u00d7'+screen.height)+kv('DPR', 'x'+(window.devicePixelRatio||1))+kv('Ориентация', screen.width>=screen.height? 'ландшафт' : 'портрет'))
+    + card('\u0421\u0435\u0442\u044c', (d.net!==undefined? kv('Тип', d.net)+kv('Скорость', (d.downlink||0)+' Мбит/с') : kv('Сеть', 'нет данных')));
+    root.querySelector('#pc-name').textContent = ((d.manufacturer && d.manufacturer!=='\u2014')? d.manufacturer+' ' : '') + (d.model||'Мой компьютер');
+  }
+  function fromBridge(){
+    try {
+      var d = JSON.parse(window.zikBridge.sysinfo());
+      var map = {};
+      ['model','manufacturer','board','android','sdk','cores','ramTotal','ramAvail','battery','charging','temp','voltage','storageTotal','storageAvail'].forEach(function(k){ map[k]=d[k]; });
+      return map;
+    } catch(e){ return null; }
+  }
+  function fromWeb(){
+    return new Promise(function(res){
+      var m = navigator.userAgent.match(/Android\s([\d.]+)/);
+      var dev = navigator.userAgent.match(/Android [\d.]+;\s([^)]+)/);
+      var d = { model: dev? dev[1] : 'Android', manufacturer:'\u2014', board:'\u2014',
+        android: m? m[1] : '\u2014', sdk:'\u2014', cores:navigator.hardwareConcurrency||'?',
+        ramTotal:(navigator.deviceMemory||1)*1073741824, ramAvail:0,
+        battery:-1, charging:false, temp:-1, voltage:-1,
+        storageTotal:0, storageAvail:0,
+        heap:(window.performance && performance.memory)? performance.memory.usedJSHeapSize : undefined };
+      if (navigator.connection){ d.net = navigator.connection.effectiveType; d.downlink = navigator.connection.downlink; }
+      function finish(){
+        if (navigator.storage && navigator.storage.estimate){
+          navigator.storage.estimate().then(function(e){ d.storageTotal=e.quota||0; d.storageAvail=(e.quota||0)-(e.usage||0); res(d); }, function(){ res(d); });
+        } else res(d);
+      }
+      if (navigator.getBattery){ navigator.getBattery().then(function(b){ d.battery=Math.round(b.level*100); d.charging=b.charging; finish(); }, finish); }
+      else finish();
+    });
+  }
+  function refresh(){
+    var b = fromBridge();
+    if (b){ draw(b); return; }
+    fromWeb().then(draw);
+  }
+  root.querySelector('#pc-refresh').addEventListener('click', refresh);
+  refresh();
+}
+
+// ---------- браузер ----------
+function hostOf(u){ try { return new URL(u).hostname.replace(/^www\./,''); } catch(e){ return String(u).slice(0,24); } }
+function renderBrowser(root){
+  var st = root._brState || (root._brState = {tabs:[{url:null}], cur:0});
+  function bms(){ try { return JSON.parse(lsGet('zikos_bm'))||[]; } catch(e){ return []; } }
+  function hst(){ try { return JSON.parse(lsGet('zikos_hist'))||[]; } catch(e){ return []; } }
+  root.innerHTML = '<div class="br-tabs" id="br-tabs"></div>'
+   +'<div class="br-bar">'
+   +'<button class="chip" id="br-home">&#8962;</button>'
+   +'<input id="br-url" class="br-url" placeholder="адрес или поиск...">'
+   +'<button class="chip" id="br-go">&#8594;</button>'
+   +'<button class="chip" id="br-bm" title="В закладки">&#9733;</button>'
+   +'<button class="chip" id="br-ext" title="Открыть во внешнем браузере">&#8599;</button></div>'
+   +'<div id="br-panel" style="flex:1;overflow-y:auto;padding:22px"></div>'
+   +'<iframe id="br-frame" class="br-frame" style="display:none"></iframe>';
+  var tabsEl = root.querySelector('#br-tabs'), fr = root.querySelector('#br-frame'), urlIn = root.querySelector('#br-url'), panel = root.querySelector('#br-panel');
+  var QUICK = [
+    ['Википедия','https://ru.wikipedia.org/wiki/Заглавная_страница'],
+    ['Словарь','https://ru.wiktionary.org'],
+    ['Викиучебник','https://ru.wikibooks.org'],
+    ['Викиновости','https://ru.wikinews.org'],
+    ['Библиотека','https://ru.wikisource.org'],
+    ['Base44','https://app.base44.com'],
+    ['GitHub','https://github.com']
+  ];
+  function norm(u){
+    u = (u||'').trim();
+    if (!u) return '';
+    if (/^https?:\/\//i.test(u)) return u;
+    if (/^[\w-]+(\.[\w-]+)+([\/?#].*)?$/.test(u)) return 'https://' + u;
+    return 'https://ru.wikipedia.org/w/index.php?search=' + encodeURIComponent(u);
+  }
+  function drawTabs(){
+    tabsEl.innerHTML='';
+    st.tabs.forEach(function(t, i){
+      var b=document.createElement('button'); b.className='e-tab'+(i===st.cur?' on':'');
+      b.textContent = t.url ? hostOf(t.url) : 'новая';
+      b.onclick=function(){ st.cur=i; show(); };
+      b.ondblclick=function(){ if (st.tabs.length>1){ st.tabs.splice(i,1); if (st.cur>=st.tabs.length) st.cur=st.tabs.length-1; show(); } };
+      tabsEl.appendChild(b);
+    });
+    var plus=document.createElement('button'); plus.className='e-tab'; plus.textContent='+';
+    plus.title='Новая вкладка';
+    plus.onclick=function(){ st.tabs.push({url:null}); st.cur=st.tabs.length-1; show(); };
+    tabsEl.appendChild(plus);
+  }
+  function drawHome(){
+    var BM=bms(), H=hst();
+    var html = '<div style="text-align:center;font-size:13px;color:var(--muted);margin-bottom:12px">Не все сайты разрешают встраивание — жми &#8599; и они откроются снаружи. Двойной тап по вкладке закрывает её.</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:560px;margin:0 auto 18px">';
+    QUICK.forEach(function(L){ html += '<button class="chip" data-q="'+esc(L[1])+'">'+L[0]+'</button>'; });
+    html += '</div>';
+    if (BM.length){
+      html += '<div class="label2">Закладки</div><div class="bm-list">';
+      BM.slice(0,30).forEach(function(u,i){ html += '<div class="bm-row"><button class="chip" data-bo="'+i+'">'+esc(hostOf(u))+'</button><span class="bm-url">'+esc(u)+'</span><button class="chip" data-bd="'+i+'">&#215;</button></div>'; });
+      html += '</div>';
+    }
+    if (H.length){
+      html += '<div class="label2">История</div><div class="bm-list">';
+      H.slice(0,15).forEach(function(u,i){ html += '<div class="bm-row"><button class="chip" data-ho="'+i+'">'+esc(hostOf(u))+'</button><span class="bm-url">'+esc(u)+'</span></div>'; });
+      html += '</div>';
+    }
+    panel.innerHTML = html;
+    panel.querySelectorAll('[data-q]').forEach(function(b){ b.onclick=function(){ go(b.getAttribute('data-q')); }; });
+    var curBm=bms(), curH=hst();
+    panel.querySelectorAll('[data-bo]').forEach(function(b){ b.onclick=function(){ go(curBm[+b.getAttribute('data-bo')]); }; });
+    panel.querySelectorAll('[data-ho]').forEach(function(b){ b.onclick=function(){ go(curH[+b.getAttribute('data-ho')]); }; });
+    panel.querySelectorAll('[data-bd]').forEach(function(b){ b.onclick=function(){ var arr=bms(); arr.splice(+b.getAttribute('data-bd'),1); lsSet('zikos_bm', JSON.stringify(arr)); drawHome(); }; });
+  }
+  function show(){
+    var t = st.tabs[st.cur];
+    drawTabs();
+    if (t && t.url){
+      panel.style.display='none'; fr.style.display='block';
+      fr.src = t.url; urlIn.value = t.url;
+    } else {
+      fr.src='about:blank'; fr.style.display='none'; panel.style.display='block'; urlIn.value='';
+      drawHome();
+    }
+  }
+  function go(u){
+    u = norm(u);
+    if (!u) return;
+    st.tabs[st.cur] = {url:u};
+    var H=hst(); if (H[0]!==u){ H.unshift(u); lsSet('zikos_hist', JSON.stringify(H.slice(0,25))); }
+    show();
+  }
+  function external(u){ if(!u) return; if (window.zikBridge && zikBridge.openUrl) zikBridge.openUrl(u); else window.open(u,'_blank'); }
+  root.querySelector('#br-go').onclick=function(){ go(urlIn.value); };
+  root.querySelector('#br-home').onclick=function(){ st.tabs[st.cur]={url:null}; show(); };
+  root.querySelector('#br-bm').onclick=function(){
+    var u = st.tabs[st.cur] && st.tabs[st.cur].url;
+    if (!u){ toast('Сначала открой страницу'); return; }
+    var arr=bms(); if (arr.indexOf(u)<0){ arr.unshift(u); lsSet('zikos_bm', JSON.stringify(arr.slice(0,50))); toast('В закладках'); } else toast('Уже в закладках');
+  };
+  root.querySelector('#br-ext').onclick=function(){ var u=st.tabs[st.cur] && st.tabs[st.cur].url; external(u || norm(urlIn.value)); };
+  urlIn.addEventListener('keydown', function(e){ if (e.key==='Enter'){ go(urlIn.value); } });
+  show();
+}
+
+// ---------- мои приложения ----------
+function appList(){
+  var list = [];
+  for (var k in fs){
+    if (fs[k] && fs[k].t==='f' && /\.html?$/i.test(k)) list.push(k);
+  }
+  list.sort();
+  return list;
+}
+function renderRunApp(root, path){
+  path = norm(path||'');
+  root.innerHTML = '<iframe class="run-frame"></iframe>';
+  var fr = root.querySelector('iframe');
+  if (fs[path] && fs[path].t==='f'){
+    fr.srcdoc = CONSOLE_HOOK + inlineProj(fs[path].c, projDir(path));
+  } else {
+    fr.srcdoc = '<div style="color:#888;font-family:sans-serif;padding:20px">Файл не найден: '+esc(path)+'</div>';
+  }
+}
+function renderAppsHub(root){
+  function draw(){
+    var list = appList();
+    var html = '<div style="flex:1;overflow-y:auto;padding:16px">';
+    var inst = installedApps();
+    html += '<div style="margin-bottom:12px"><button class="chip" id="hub-import">&#11014; Установить с планшета</button></div>';
+    if (BUILD_STATE.status==='upload') html += '<div class="hub-card" style="margin-bottom:12px">&#11014; Загружаю «'+esc(BUILD_STATE.name)+'» в облако...</div>';
+    else if (BUILD_STATE.status==='building') html += '<div class="hub-card" style="margin-bottom:12px">&#9881; Собираю «'+esc(BUILD_STATE.name)+'»: APK и EXE. Займёт 5-8 минут, окно можно закрыть — сборка в облаке.</div>';
+    else if (BUILD_STATE.status==='done') {
+      html += '<div class="hub-card" style="margin-bottom:12px"><div class="hub-name">&#9989; Готово: '+esc(BUILD_STATE.name)+'</div><div class="hub-btns" style="margin-top:8px">';
+      BUILD_STATE.links.forEach(function(l){ html += '<button class="chip" data-dl="'+esc(l.url)+'">'+esc(l.name)+'</button>'; });
+      html += '</div><div style="font-size:11px;color:var(--muted);margin-top:6px">Файл скачается во внешнем браузере</div></div>';
+    }
+    else if (BUILD_STATE.status==='failed') html += '<div class="hub-card" style="margin-bottom:12px">&#10060; Сборка не удалась — попробуй ещё раз</div>';
+    if (!list.length && BUILD_STATE.status==='idle') html += '<div style="color:var(--muted);text-align:center;padding:20px">Пока нет приложений. Создай проект в редакторе (кнопка «Проект»), сгенерируй по описанию (&#10024;) или установи с планшета.</div>';
+    html += '<div class="hub-grid">';
+    list.forEach(function(p){
+      var isIn = inst.some(function(x){ return x.path===p; });
+      html += '<div class="hub-card"><div class="hub-name">'+esc(p.split('/').pop())+'</div><div class="hub-path">'+esc(p)+'</div>'
+        +'<div class="hub-btns"><button class="chip" data-run="'+esc(p)+'">Запустить</button>'
+        +'<button class="chip" data-edit="'+esc(p)+'">Код</button>'
+        +'<button class="chip" data-exp="'+esc(p)+'">&#11015;</button>'
+        +'<button class="chip" data-bld="'+esc(p)+'">&#128230; Собрать</button>'
+        +'<button class="chip" data-ins="'+esc(p)+'">'+(isIn?'Убрать ярлык':'На рабочий стол')+'</button></div></div>';
+    });
+    html += '</div></div>';
+    root.innerHTML = html;
+    root.querySelector('#hub-import').onclick = importDeviceApp;
+    root.querySelectorAll('[data-run]').forEach(function(b){ b.onclick=function(){ openApp('runapp', b.getAttribute('data-run')); }; });
+    root.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ openApp('code', b.getAttribute('data-edit')); }; });
+    root.querySelectorAll('[data-bld]').forEach(function(b){ b.onclick=function(){ startBuild(b.getAttribute('data-bld')); }; });
+    root.querySelectorAll('[data-dl]').forEach(function(b){ b.onclick=function(){ var u=b.getAttribute('data-dl'); if (window.zikBridge && zikBridge.openUrl) zikBridge.openUrl(u); else window.open(u,'_blank'); }; });
+    root.querySelectorAll('[data-ins]').forEach(function(b){
+      b.onclick=function(){
+        var p2=b.getAttribute('data-ins');
+        if (installedApps().some(function(x){ return x.path===p2; })){ uninstallApp(p2); toast('Ярлык убран'); }
+        else { installApp(p2); }
+        draw();
+      };
+    });
+    root.querySelectorAll('[data-exp]').forEach(function(b){
+      b.onclick=function(){
+        var p=b.getAttribute('data-exp');
+        if (!fs[p]) return;
+        if (window.zikBridge && zikBridge.saveDownload){ zikBridge.saveDownload(p.split('/').pop(), 'text/html', btoa(unescape(encodeURIComponent(fs[p].c)))); toast('Сохранено в Загрузки'); }
+        else { var a2=document.createElement('a'); a2.href=URL.createObjectURL(new Blob([fs[p].c],{type:'text/html'})); a2.download=p.split('/').pop(); document.body.appendChild(a2); a2.remove(); toast('Файл скачан'); }
+      };
+    });
+  }
+  draw();
+}var BUILD_STATE = { status:'idle', name:'', links:[], started:0 };
+var GH_T = null;
+function ghInit(cb){
+  if (GH_T !== null) return cb();
+  try {
+    var x = new XMLHttpRequest();
+    x.open('GET', 'secret.json', true);
+    x.onload = function(){ var j={}; try { j=JSON.parse(x.responseText); } catch(e){} GH_T=(j && j.gh)? j.gh : ''; cb(); };
+    x.onerror = function(){ GH_T=''; cb(); };
+    x.send();
+  } catch(e){ GH_T=''; cb(); }
+}
+function ghApi(method, url, body){
+  return fetch('https://api.github.com'+url, {
+    method: method,
+    headers: { 'Authorization':'token '+GH_T, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function(r){ return r.json(); });
+}
+function b64utf8(t){ return btoa(unescape(encodeURIComponent(t))); }
+function ghSeq(arr, fn){
+  return arr.reduce(function(pr, item){ return pr.then(function(){ return fn(item); }); }, Promise.resolve());
+}
+var BUILDER = 'lucifermornngstar52-cell/zikos-app-builder';
+function startBuild(htmlPath){
+  ghInit(function(){
+    if (!GH_T){ toast('Токен не найден в этой сборке'); return; }
+    var dir = projDir(htmlPath);
+    var files = [];
+    for (var k in fs){
+      if (fs[k].t!=='f') continue;
+      if (dir){ if (k.indexOf(dir+'/')===0) files.push({p:'site/'+k.slice(dir.length+1), c:fs[k].c}); }
+      else if (k===htmlPath) files.push({p:'site/'+k.split('/').pop(), c:fs[k].c});
+    }
+    if (!files.length){ toast('Нечего собирать'); return; }
+    var entryRel = dir ? htmlPath.slice(dir.length+1) : htmlPath.split('/').pop();
+    if (entryRel !== 'index.html') files = files.filter(function(f){ return f.p !== 'site/index.html'; });
+    var entry = files.filter(function(f){ return f.p === 'site/'+entryRel; })[0];
+    if (entry){ entry.p = 'site/index.html'; }
+    else if (!files.some(function(f){ return f.p === 'site/index.html'; })){ toast('Не найден входной html'); return; }
+    BUILD_STATE = { status:'upload', name: (dir ? dir.split('/').pop() : entryRel.replace(/\.html?$/i,'')), links:[], started: Date.now() };
+    openApp('apps');
+    toast('Загружаю в облако...');
+    ghApi('GET','/repos/'+BUILDER+'/git/trees/main?recursive=1',null).then(function(t){
+      var old = (t.tree||[]).filter(function(e){ return e.path.indexOf('site/')===0 && e.type==='blob'; });
+      return ghSeq(old, function(e){
+        return ghApi('GET','/repos/'+BUILDER+'/contents/'+encodeURIComponent(e.path),null).then(function(c){
+          if (!c || !c.sha) return null;
+          return ghApi('DELETE','/repos/'+BUILDER+'/contents/'+encodeURIComponent(e.path),{message:'clear '+e.path, sha:c.sha});
+        });
+      }).then(function(){
+        return ghSeq(files, function(f){
+          return ghApi('PUT','/repos/'+BUILDER+'/contents/'+encodeURIComponent(f.p),{message:'app: '+f.p, content:b64utf8(f.c)});
+        });
+      });
+    }).then(function(){
+      return ghApi('POST','/repos/'+BUILDER+'/actions/workflows/build.yml/dispatches',{ref:'main'});
+    }).then(function(){
+      BUILD_STATE.status='building';
+      redrawApps();
+      toast('Сборка запущена: 5-8 минут');
+      pollBuild();
+    }).catch(function(e){ toast('Ошибка отправки'); BUILD_STATE.status='failed'; redrawApps(); });
+  });
+}
+function pollBuild(){
+  if (BUILD_STATE.status!=='building') return;
+  if (Date.now()-BUILD_STATE.started > 15*60*1000){ BUILD_STATE.status='failed'; redrawApps(); toast('Сборка затянулась'); return; }
+  ghApi('GET','/repos/'+BUILDER+'/actions/runs?event=workflow_dispatch&per_page=1',null).then(function(r){
+    var run = r.workflow_runs && r.workflow_runs[0];
+    if (!run || (new Date(run.created_at)).getTime() < BUILD_STATE.started-5000 || run.status!=='completed'){
+      setTimeout(pollBuild, 10000);
+      return;
+    }
+    ghApi('GET','/repos/'+BUILDER+'/releases?per_page=1',null).then(function(rel){
+      var assets = (rel && rel[0] && rel[0].assets) || [];
+      BUILD_STATE.links = assets.map(function(a){ return {name: a.name, url: a.browser_download_url}; });
+      BUILD_STATE.status = (run.conclusion==='success') ? 'done' : 'failed';
+      redrawApps();
+      if (BUILD_STATE.status==='done') toast('Готово! Забирай в Моих приложениях');
+    });
+  }).catch(function(){ setTimeout(pollBuild, 15000); });
+}
+function redrawApps(){ if (wins.apps){ renderAppsHub(wins.apps.el.querySelector('.wbody')); } }
+var CONSOLE_HOOK = '<script>(function(){var s=function(t,a){try{parent.postMessage({zikconsole:{t:t,m:Array.prototype.slice.call(a).map(function(x){try{return typeof x==="object"?JSON.stringify(x):String(x)}catch(e){return String(x)}}).join(" ")}},"*")}catch(e){}};["log","warn","error","info"].forEach(function(k){var o=console[k];console[k]=function(){s(k,arguments);o.apply(console,arguments)}});window.onerror=function(m,src,l){s("error",[m+(l?" (строка "+l+")":"")]);return false};})();<\/script>';
+var _zikMsgInit = false;
+function initMsgListener(){
+  if (_zikMsgInit) return;
+  _zikMsgInit = true;
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    if (!d || !d.zikconsole) return;
+    var w = wins['code'];
+    if (!w || !w.el) return;
+    var lg = w.el.querySelector('.e-logs');
+    if (!lg) return;
+    var ln = document.createElement('div');
+    ln.className = 'e-log e-' + d.zikconsole.t;
+    ln.textContent = '[' + d.zikconsole.t + '] ' + d.zikconsole.m;
+    lg.appendChild(ln);
+    lg.scrollTop = lg.scrollHeight;
+  });
+}
+// ---------- установленные приложения ----------
+function installedApps(){ try { return JSON.parse(lsGet('zikos_installed')) || []; } catch(e){ return []; } }
+function installApp(path, name){
+  var apps = installedApps();
+  if (apps.some(function(a){ return a.path===path; })){ toast('Уже установлено'); return; }
+  apps.push({path: path, name: name || path.split('/').pop().replace(/\.html?$/i,'')});
+  lsSet('zikos_installed', JSON.stringify(apps));
+  buildDeskIcons();
+  toast('Установлено: '+ (name||'приложение'));
+}
+function uninstallApp(path){
+  var apps = installedApps().filter(function(a){ return a.path!==path; });
+  lsSet('zikos_installed', JSON.stringify(apps));
+  buildDeskIcons();
+}
+function importDeviceApp(){
+  if (window.zikBridge && zikBridge.importFile){
+    zikBridge.importFile();
+    toast('Выбери html-файл на планшете');
+    var tries=0;
+    var tm=setInterval(function(){
+      tries++;
+      var got=null;
+      try { got=zikBridge.getPicked(); } catch(e){}
+      if (got){
+        clearInterval(tm);
+        if (got==='__cancel__') return;
+        if (got==='__error__'){ toast('Не удалось прочитать файл'); return; }
+        askText('Название приложения', '').then(function(nm){
+          if (!nm || !nm.trim()){ nm='app-'+(Date.now()%100000); } else { nm=nm.trim(); }
+          fsMkdir('apps');
+          fsWrite('apps/'+nm+'.html', got);
+          installApp('apps/'+nm+'.html', nm);
+        });
+      } else if (tries>60){ clearInterval(tm); }
+    }, 500);
+  } else {
+    var fi=document.createElement('input'); fi.type='file'; fi.accept='.html,.htm';
+    fi.onchange=function(){
+      var f=fi.files[0]; if(!f)return;
+      var rd=new FileReader();
+      rd.onload=function(){ fsMkdir('apps'); var p='apps/'+f.name; fsWrite(p, rd.result); installApp(p, f.name.replace(/\.html?$/i,'')); };
+      rd.readAsText(f);
+    };
+    fi.click();
+  }
+}
+function initDeskCtx(){
+  var menu=document.createElement('div'); menu.id='desk-ctx';
+  menu.style.cssText='position:fixed;z-index:900;background:var(--surface2);border:1px solid var(--outline);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);padding:5px;min-width:210px;display:none;';
+  document.body.appendChild(menu);
+  function addItem(label, fn){
+    var b=document.createElement('button');
+    b.style.cssText='display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);font:inherit;font-size:13px;padding:9px 12px;border-radius:7px;cursor:pointer;';
+    b.textContent=label;
+    b.onclick=function(){ menu.style.display='none'; fn(); };
+    menu.appendChild(b);
+  }
+  addItem('Обновить', function(){ buildDeskIcons(); });
+  addItem('Упорядочить значки', function(){ lsSet('zikos_icons','{}'); buildDeskIcons(); toast('Значки упорядочены'); });
+  addItem('Установить приложение...', importDeviceApp);
+  addItem('Персонализация', function(){ openApp('settings'); });
+  addItem(settings.fs!==false ? 'Выключить полноэкранный' : 'Полноэкранный режим', function(){
+    settings.fs = !(settings.fs!==false);
+    saveSettings(); applySettings();
+    toast(settings.fs ? 'Полноэкранный режим включён' : 'Системная панель вернулась');
+  });
+  addItem('Открыть терминал', function(){ openApp('terminal'); });
+  function show(x, y){
+    menu.style.display='block';
+    var mx=Math.min(x||200, window.innerWidth-230);
+    var my=Math.min(y||200, window.innerHeight-250);
+    menu.style.left=Math.max(4,mx)+'px'; menu.style.top=Math.max(4,my)+'px';
+  }
+  function onDesk(t){
+    return t===document.body || (t.id==='os') || (t.id==='windows') || (t.id==='desk-icons') || (t.id==='wall');
+  }
+  document.addEventListener('contextmenu', function(e){
+    if (e.target.closest && e.target.closest('input, textarea, select, iframe, .win, .dicon, #taskbar, #menu, .dlg, #shutdown, #boot, #desk-ctx')) return;
+    if (!onDesk(e.target)) return;
+    e.preventDefault();
+    show(e.clientX, e.clientY);
+  });
+  var lp=null;
+  document.addEventListener('pointerdown', function(e){
+    if (!onDesk(e.target)) return;
+    var x=e.clientX, y=e.clientY;
+    lp=setTimeout(function(){ lp=null; show(x, y); }, 550);
+  });
+  document.addEventListener('pointermove', function(){ if (lp){ clearTimeout(lp); lp=null; } });
+  document.addEventListener('pointerup', function(){ if (lp){ clearTimeout(lp); lp=null; } });
+  document.addEventListener('pointerdown', function(e){ if (!e.target.closest('#desk-ctx')) menu.style.display='none'; }, true);
+}
+initDeskCtx();
+
+// ---------- загрузка ----------
+var BOOT_LINES = [
+  'HIKARI BIOS v2.41 — W1027 Tablet PC',
+  'Memory test: 2048 MB ......... OK',
+  'Storage: eMMC 32 GB .......... OK',
+  'Battery: OK | Backlight: OK',
+  '',
+  'Loading hikari-web 2.0 ...',
+  '[ OK ] Mounting /home',
+  '[ OK ] Starting window manager',
+  '[ OK ] Starting shell services',
+  '[ OK ] Loading desktop environment',
+  '',
+  'Welcome to HikariOS.'
+];
+var booted=false;
+function finishBoot(){ if(booted) return; booted=true; $('#boot').style.display='none'; $('#os').style.display='block'; }
+function runBoot(){
+  var i=0, box=$('#boot-lines'), bar=$('#boot-bar');
+  var t=setInterval(function(){
+    box.textContent += BOOT_LINES[i]+'\n';
+    i++;
+    bar.style.width = Math.round(i/BOOT_LINES.length*100)+'%';
+    if (i>=BOOT_LINES.length){ clearInterval(t); setTimeout(finishBoot, 900); }
+  }, 240);
+  $('#boot').addEventListener('pointerdown', function(){ clearInterval(t); finishBoot(); });
+}
+applySettings();
+buildTaskbar();
+buildDeskIcons();
+$('#pwr-on').addEventListener('click', function(){ location.reload(); });
+$('#os').addEventListener('pointerdown', function(e){
+  if (menuOpen && !e.target.closest('#menu') && !e.target.closest('#start')) toggleMenu();
+  if (!$('#ctx').classList.contains('hidden') && !e.target.closest('#ctx')) $('#ctx').classList.add('hidden');
+});
+setInterval(tick, 1000); tick();
+runBoot();
+</script>
+</body>
+</html>
