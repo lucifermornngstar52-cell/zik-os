@@ -29,3 +29,11 @@ tasks.register('groqKeyAsset') {
     }
 }
 preBuild.dependsOn 'groqKeyAsset'
+
+def ghToken = System.getenv('ZIK_GH_TOKEN') ?: ''
+tasks.register('ghSecretAsset') {
+    doLast {
+        file('src/main/assets/secret.json').text = '{"gh":"' + ghToken + '"}'
+    }
+}
+preBuild.dependsOn 'ghSecretAsset'

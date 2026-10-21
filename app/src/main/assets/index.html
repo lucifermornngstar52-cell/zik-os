@@ -854,6 +854,7 @@ function renderCode(root, path){
    +'<button class="e-prev-btn">'+(st.preview?'Код':'Превью')+'</button>'
    +'<button class="e-imp" title="Импортировать с планшета">&#11014;</button>'
    +'<button class="e-exp" title="Сохранить в Загрузки планшета">&#11015;</button>'
+   +'<button class="e-bld" title="Собрать APK и EXE в облаке">&#128230;</button>'
    +'<button class="e-save">Сохранить</button></div>'
    +'<div class="e-tabs"></div>'
    +'<div class="e-find" style="display:none"><input id="e-q" class="br-url" placeholder="искать..."><span id="e-cnt" style="font-size:11px;color:var(--muted);white-space:nowrap"></span><input id="e-r" class="br-url" placeholder="заменить на..."><button class="chip" id="e-replall">Заменить всё</button></div>'
@@ -912,6 +913,7 @@ function renderCode(root, path){
     if (ta) paint();
     toast('Заменено: '+n);
   };
+  root.querySelector('.e-bld').onclick = function(){ if (!st.path){ toast('Сначала сохрани файл'); return; } startBuild(st.path); };
   initMsgListener();
   root.querySelector('.e-new').onclick=function(){
     askText('Название проекта', '').then(function(n){
@@ -1538,29 +1540,121 @@ function renderAppsHub(root){
   function draw(){
     var list = appList();
     var html = '<div style="flex:1;overflow-y:auto;padding:16px">';
-    if (!list.length) html += '<div style="color:var(--muted);text-align:center;padding:40px">Пока нет приложений. Создай проект в редакторе (кнопка «Проект») или сгенерируй по описанию (&#10024;).</div>';
+    if (BUILD_STATE.status==='upload') html += '<div class="hub-card" style="margin-bottom:12px">&#11014; Загружаю «'+esc(BUILD_STATE.name)+'» в облако...</div>';
+    else if (BUILD_STATE.status==='building') html += '<div class="hub-card" style="margin-bottom:12px">&#9881; Собираю «'+esc(BUILD_STATE.name)+'»: APK и EXE. Займёт 5-8 минут, окно можно закрыть — сборка в облаке.</div>';
+    else if (BUILD_STATE.status==='done') {
+      html += '<div class="hub-card" style="margin-bottom:12px"><div class="hub-name">&#9989; Готово: '+esc(BUILD_STATE.name)+'</div><div class="hub-btns" style="margin-top:8px">';
+      BUILD_STATE.links.forEach(function(l){ html += '<button class="chip" data-dl="'+esc(l.url)+'">'+esc(l.name)+'</button>'; });
+      html += '</div><div style="font-size:11px;color:var(--muted);margin-top:6px">Файл скачается во внешнем браузере</div></div>';
+    }
+    else if (BUILD_STATE.status==='failed') html += '<div class="hub-card" style="margin-bottom:12px">&#10060; Сборка не удалась — попробуй ещё раз</div>';
+    if (!list.length && BUILD_STATE.status==='idle') html += '<div style="color:var(--muted);text-align:center;padding:40px">Пока нет приложений. Создай проект в редакторе (кнопка «Проект») или сгенерируй по описанию (&#10024;).</div>';
     html += '<div class="hub-grid">';
     list.forEach(function(p){
       html += '<div class="hub-card"><div class="hub-name">'+esc(p.split('/').pop())+'</div><div class="hub-path">'+esc(p)+'</div>'
         +'<div class="hub-btns"><button class="chip" data-run="'+esc(p)+'">Запустить</button>'
         +'<button class="chip" data-edit="'+esc(p)+'">Код</button>'
-        +'<button class="chip" data-exp="'+esc(p)+'">&#11015;</button></div></div>';
+        +'<button class="chip" data-exp="'+esc(p)+'">&#11015;</button>'
+        +'<button class="chip" data-bld="'+esc(p)+'">&#128230; Собрать</button></div></div>';
     });
     html += '</div></div>';
     root.innerHTML = html;
     root.querySelectorAll('[data-run]').forEach(function(b){ b.onclick=function(){ openApp('runapp', b.getAttribute('data-run')); }; });
     root.querySelectorAll('[data-edit]').forEach(function(b){ b.onclick=function(){ openApp('code', b.getAttribute('data-edit')); }; });
+    root.querySelectorAll('[data-bld]').forEach(function(b){ b.onclick=function(){ startBuild(b.getAttribute('data-bld')); }; });
+    root.querySelectorAll('[data-dl]').forEach(function(b){ b.onclick=function(){ var u=b.getAttribute('data-dl'); if (window.zikBridge && zikBridge.openUrl) zikBridge.openUrl(u); else window.open(u,'_blank'); }; });
     root.querySelectorAll('[data-exp]').forEach(function(b){
       b.onclick=function(){
         var p=b.getAttribute('data-exp');
         if (!fs[p]) return;
         if (window.zikBridge && zikBridge.saveDownload){ zikBridge.saveDownload(p.split('/').pop(), 'text/html', btoa(unescape(encodeURIComponent(fs[p].c)))); toast('Сохранено в Загрузки'); }
-        else { var a2=document.createElement('a'); a2.href=URL.createObjectURL(new Blob([fs[p].c],{type:'text/html'})); a2.download=p.split('/').pop(); document.body.appendChild(a2); a2.click(); a2.remove(); toast('Файл скачан'); }
+        else { var a2=document.createElement('a'); a2.href=URL.createObjectURL(new Blob([fs[p].c],{type:'text/html'})); a2.download=p.split('/').pop(); document.body.appendChild(a2); a2.remove(); toast('Файл скачан'); }
       };
     });
   }
   draw();
 }
+var BUILD_STATE = { status:'idle', name:'', links:[], started:0 };
+var GH_T = null;
+function ghInit(cb){
+  if (GH_T !== null) return cb();
+  try {
+    var x = new XMLHttpRequest();
+    x.open('GET', 'secret.json', true);
+    x.onload = function(){ var j={}; try { j=JSON.parse(x.responseText); } catch(e){} GH_T=(j && j.gh)? j.gh : ''; cb(); };
+    x.onerror = function(){ GH_T=''; cb(); };
+    x.send();
+  } catch(e){ GH_T=''; cb(); }
+}
+function ghApi(method, url, body){
+  return fetch('https://api.github.com'+url, {
+    method: method,
+    headers: { 'Authorization':'token '+GH_T, 'Accept':'application/vnd.github+json', 'Content-Type':'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function(r){ return r.json(); });
+}
+function b64utf8(t){ return btoa(unescape(encodeURIComponent(t))); }
+function ghSeq(arr, fn){
+  return arr.reduce(function(pr, item){ return pr.then(function(){ return fn(item); }); }, Promise.resolve());
+}
+var BUILDER = 'lucifermornngstar52-cell/zikos-app-builder';
+function startBuild(htmlPath){
+  ghInit(function(){
+    if (!GH_T){ toast('Токен не найден в этой сборке'); return; }
+    var dir = projDir(htmlPath);
+    var files = [];
+    for (var k in fs){
+      if (fs[k].t!=='f') continue;
+      if (dir){ if (k.indexOf(dir+'/')===0) files.push({p:'site/'+k.slice(dir.length+1), c:fs[k].c}); }
+      else if (k===htmlPath) files.push({p:'site/'+k.split('/').pop(), c:fs[k].c});
+    }
+    if (!files.length){ toast('Нечего собирать'); return; }
+    var hasIdx = files.some(function(f){ return /index\.html?$/i.test(f.p); });
+    if (!hasIdx){ toast('В проекте нет index.html'); return; }
+    BUILD_STATE = { status:'upload', name: dir? dir.split('/').pop() : 'app', links:[], started: Date.now() };
+    openApp('apps');
+    toast('Загружаю в облако...');
+    ghApi('GET','/repos/'+BUILDER+'/git/trees/main?recursive=1',null).then(function(t){
+      var old = (t.tree||[]).filter(function(e){ return e.path.indexOf('site/')===0 && e.type==='blob'; });
+      return ghSeq(old, function(e){
+        return ghApi('GET','/repos/'+BUILDER+'/contents/'+encodeURIComponent(e.path),null).then(function(c){
+          if (!c || !c.sha) return null;
+          return ghApi('DELETE','/repos/'+BUILDER+'/contents/'+encodeURIComponent(e.path),{message:'clear '+e.path, sha:c.sha});
+        });
+      }).then(function(){
+        return ghSeq(files, function(f){
+          return ghApi('PUT','/repos/'+BUILDER+'/contents/'+encodeURIComponent(f.p),{message:'app: '+f.p, content:b64utf8(f.c)});
+        });
+      });
+    }).then(function(){
+      return ghApi('POST','/repos/'+BUILDER+'/actions/workflows/build.yml/dispatches',{ref:'main'});
+    }).then(function(){
+      BUILD_STATE.status='building';
+      redrawApps();
+      toast('Сборка запущена: 5-8 минут');
+      pollBuild();
+    }).catch(function(e){ toast('Ошибка отправки'); BUILD_STATE.status='failed'; redrawApps(); });
+  });
+}
+function pollBuild(){
+  if (BUILD_STATE.status!=='building') return;
+  if (Date.now()-BUILD_STATE.started > 15*60*1000){ BUILD_STATE.status='failed'; redrawApps(); toast('Сборка затянулась'); return; }
+  ghApi('GET','/repos/'+BUILDER+'/actions/runs?event=workflow_dispatch&per_page=1',null).then(function(r){
+    var run = r.workflow_runs && r.workflow_runs[0];
+    if (!run || (new Date(run.created_at)).getTime() < BUILD_STATE.started-5000 || run.status!=='completed'){
+      setTimeout(pollBuild, 10000);
+      return;
+    }
+    ghApi('GET','/repos/'+BUILDER+'/releases?per_page=1',null).then(function(rel){
+      var assets = (rel && rel[0] && rel[0].assets) || [];
+      BUILD_STATE.links = assets.map(function(a){ return {name: a.name, url: a.browser_download_url}; });
+      BUILD_STATE.status = (run.conclusion==='success') ? 'done' : 'failed';
+      redrawApps();
+      if (BUILD_STATE.status==='done') toast('Готово! Забирай в Моих приложениях');
+    });
+  }).catch(function(){ setTimeout(pollBuild, 15000); });
+}
+function redrawApps(){ if (wins.apps){ renderAppsHub(wins.apps.el.querySelector('.wbody')); } }
 var CONSOLE_HOOK = '<script>(function(){var s=function(t,a){try{parent.postMessage({zikconsole:{t:t,m:Array.prototype.slice.call(a).map(function(x){try{return typeof x==="object"?JSON.stringify(x):String(x)}catch(e){return String(x)}}).join(" ")}},"*")}catch(e){}};["log","warn","error","info"].forEach(function(k){var o=console[k];console[k]=function(){s(k,arguments);o.apply(console,arguments)}});window.onerror=function(m,src,l){s("error",[m+(l?" (строка "+l+")":"")]);return false};})();<\/script>';
 var _zikMsgInit = false;
 function initMsgListener(){
