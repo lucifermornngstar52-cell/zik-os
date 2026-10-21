@@ -469,16 +469,16 @@ function buildTaskbar(){
 function buildDeskIcons(){
   var c = $('#desk-icons'); c.innerHTML='';
   var pos = {};
-  try { pos = JSON.parse(lsGet('zikos_icons')) || {}; } catch(e){ pos={}; }
-  var layerH = (window.innerHeight||720) - 118;
-  var perCol = Math.max(1, Math.floor(layerH/95));
+  try { pos = JSON.parse(lsGet('hikari_icons')) || {}; } catch(e){ pos={}; }
+  var layerW = (window.innerWidth||1280) - 20;
+  var perRow = Math.max(1, Math.floor(layerW/94));
   var gov = document.createElement('div'); gov.id='grid-overlay'; c.appendChild(gov);
   var added = 0;
   function makeIcon(key, label, iconSvg, onClick){
     var d=document.createElement('div'); d.className='dicon';
     d.innerHTML='<div class="ic">'+iconSvg+'</div><span>'+label+'</span>';
     var p=(pos[key] && typeof pos[key].x==='number') ? pos[key] : null;
-    if (!p){ p={x:10+Math.floor(added/perCol)*94, y:10+(added%perCol)*95}; }
+    if (!p){ p={x:10+(added%perRow)*94, y:10+Math.floor(added/perRow)*95}; }
     added++;
     d.style.left=p.x+'px'; d.style.top=p.y+'px';
     var down=null, held=false, hold=null;
@@ -514,7 +514,7 @@ function buildDeskIcons(){
         p.y=Math.max(10, Math.min(Math.round((p.y-10)/95)*95+10, window.innerHeight-150));
         d.style.left=p.x+'px'; d.style.top=p.y+'px';
         pos[key]={x:p.x,y:p.y};
-        lsSet('zikos_icons', JSON.stringify(pos));
+        lsSet('hikari_icons', JSON.stringify(pos));
       } else if (down && !held){
         onClick();
       }
@@ -1793,7 +1793,7 @@ function initDeskCtx(){
     menu.appendChild(b);
   }
   addItem('Обновить', function(){ buildDeskIcons(); });
-  addItem('Упорядочить значки', function(){ lsSet('zikos_icons','{}'); buildDeskIcons(); toast('Значки упорядочены'); });
+  addItem('Упорядочить значки', function(){ lsSet('hikari_icons','{}'); buildDeskIcons(); toast('Значки упорядочены'); });
   addItem('Установить приложение...', importDeviceApp);
   addItem('Персонализация', function(){ openApp('settings'); });
   addItem(settings.fs!==false ? 'Выключить полноэкранный' : 'Полноэкранный режим', function(){
