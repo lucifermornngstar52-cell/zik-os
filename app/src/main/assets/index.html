@@ -236,6 +236,8 @@ textarea.ta { width:100%; min-height:84px; background:var(--card); color:var(--t
 .tray-ic { display:flex; align-items:center; gap:3px; padding:0 6px; opacity:.92; }
 .tray-ic svg { width:15px; height:15px; }
 #batt-pct { font-size:11px; }
+.tb-btn.app { position:relative; }
+.app.pinned::after { content:''; position:absolute; bottom:3px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--accent); }
 </style>
 </head>
 <body>
@@ -251,7 +253,7 @@ textarea.ta { width:100%; min-height:84px; background:var(--card); color:var(--t
   <div id="menu" class="hidden"></div>
   <div id="taskbar">
     <div class="tb-center" id="tb-center"></div>
-    <div class="tb-right"><span class="tray-ic" id="tray-wifi" title="Wi-Fi: подключено"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 8.7a15 15 0 0 1 20 0"/><path d="M5.8 12.3a10 10 0 0 1 12.4 0"/><path d="M9.4 15.9a5 5 0 0 1 5.2 0"/><circle cx="12" cy="19.3" r="0.8" fill="currentColor" stroke="none"/></svg></span><span class="tray-ic" id="tray-batt" title="Батарея"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.2" y="7.5" width="17.6" height="9" rx="2.2"/><path d="M21.8 10.5v3" stroke-width="2"/><rect x="4" y="9.2" width="11.5" height="5.6" rx="1" fill="currentColor" stroke="none"/></svg><span id="batt-pct"></span></span><span id="clock"></span><button class="tb-btn" id="theme-btn" title="Тема"></button></div>
+    <div class="tb-right"><span class="tray-ic" id="tray-wifi" title="Wi-Fi: подключено"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 8.7a15 15 0 0 1 20 0"/><path d="M5.8 12.3a10 10 0 0 1 12.4 0"/><path d="M9.4 15.9a5 5 0 0 1 5.2 0"/><circle cx="12" cy="19.3" r="0.8" fill="currentColor" stroke="none"/></svg></span><span class="tray-ic" id="tray-batt" title="Батарея"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.2" y="7.5" width="17.6" height="9" rx="2.2"/><path d="M21.8 10.5v3" stroke-width="2"/><rect x="4" y="9.2" width="11.5" height="5.6" rx="1" fill="currentColor" stroke="none"/></svg><span id="batt-pct"></span></span><span id="clock"></span></div>
   </div>
   <div id="shutdown" class="hidden"><div class="zlogo">Z</div><div>Питание выключено</div><button class="chip" id="pwr-on">Включить</button></div>
 </div>
@@ -318,6 +320,36 @@ function applySettings(){
   updateThemeBtn();
 }
 function saveSettings(){ lsSet('zikos_settings', JSON.stringify(settings)); applySettings(); }
+function getPins(){ try { return JSON.parse(lsGet('hikari_pins')||'[]'); } catch(e){ return []; } }
+function setPins(a){ lsSet('hikari_pins', JSON.stringify(a)); }
+function tileCtx(x, y, key){
+  var m=document.getElementById('menu-ctx');
+  if(!m){
+    m=document.createElement('div'); m.id='menu-ctx';
+    m.style.cssText='position:fixed;z-index:1200;background:var(--surface2);border:1px solid var(--outline);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.5);padding:5px;min-width:200px;display:none;';
+    document.body.appendChild(m);
+    document.addEventListener('pointerdown', function(e){ if(!m.contains(e.target)) m.style.display='none'; }, true);
+  }
+  m.innerHTML='';
+  function item(label, fn){
+    var b=document.createElement('button');
+    b.style.cssText='display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);font:inherit;font-size:13px;padding:9px 12px;border-radius:7px;cursor:pointer;';
+    b.textContent=label;
+    b.onclick=function(){ m.style.display='none'; fn(); };
+    m.appendChild(b);
+  }
+  var pins=getPins(), pinned=pins.indexOf(key)>=0;
+  item(pinned?'Открепить от панели задач':'Закрепить в панели задач', function(){
+    if(pinned) setPins(pins.filter(function(x){ return x!==key; }));
+    else { pins.push(key); setPins(pins); }
+    syncTaskbar();
+    toast(pinned?'Откреплено от панели задач':'Закреплено в панели задач');
+  });
+  item('Отмена', function(){});
+  m.style.display='block';
+  m.style.left=Math.min(x, (window.innerWidth||800)-210)+'px';
+  m.style.top=Math.min(y, (window.innerHeight||600)-140)+'px';
+}
 function updateThemeBtn(){ var b=$('#theme-btn'); if(b) b.innerHTML = settings.dark ? IC.sun : IC.moon; }
 
 // ---------- файловая система ----------
@@ -448,31 +480,66 @@ function refreshFiles(){ if(wins.files){ var b=wins.files.el.querySelector('.wbo
 // ---------- таскбар и пуск ----------
 function syncTaskbar(){
   var c = $('#tb-center');
+  var pins = getPins();
   var html = '<button class="tb-btn" id="start" title="Пуск">'+IC.start+'</button>';
-  Object.keys(wins).forEach(function(id){
-    var w = wins[id]; if (!w) return;
-    var a = APPS.filter(function(x){ return x.id===id; })[0];
-    var title = a ? a.title : (w.title || id);
-    var icon = a ? a.icon : IC.apps;
-    var cls = 'tb-btn app' + (!w.minimized && w.el.classList.contains('focused') ? ' focused' : '');
-    html += '<button class="'+cls+'" data-app="'+esc(id)+'" title="'+esc(title)+'">'+icon+'</button>';
+  pins.forEach(function(key){
+    var a = APPS.filter(function(x){ return x.id===key; })[0];
+    var title, icon;
+    if (a){ title=a.title; icon=a.icon; }
+    else if (key.indexOf('user:')===0){
+      var path=key.slice(5); title=path.split('/').pop().replace(/\.html?$/i,''); icon=IC.apps;
+      var ins=installedApps().filter(function(x){ return x.path===path; })[0];
+      if (ins) title=ins.name;
+    } else { title=key; icon=IC.apps; }
+    var w=wins[key];
+    var cls='tb-btn app pinned'+(w && !w.minimized && w.el.classList.contains('focused')?' focused':'');
+    html+='<button class="'+cls+'" data-app="'+esc(key)+'" title="'+esc(title)+'">'+icon+'</button>';
   });
-  c.innerHTML = html;
+  Object.keys(wins).forEach(function(id){
+    if (pins.indexOf(id)>=0) return;
+    if (id==='runapp' && pins.some(function(k){ return k.indexOf('user:')===0; })) return;
+    var w=wins[id]; if(!w) return;
+    var a=APPS.filter(function(x){ return x.id===id; })[0];
+    var title=a?a.title:(w.title||id);
+    var icon=a?a.icon:IC.apps;
+    var cls='tb-btn app'+(!w.minimized && w.el.classList.contains('focused')?' focused':'');
+    html+='<button class="'+cls+'" data-app="'+esc(id)+'" title="'+esc(title)+'">'+icon+'</button>';
+  });
+  c.innerHTML=html;
   $('#start').addEventListener('click', toggleMenu);
-  var bs = c.querySelectorAll('.app');
+  var bs=c.querySelectorAll('.app');
   for (var j=0;j<bs.length;j++)(function(b){
+    var hold=null;
+    b.addEventListener('pointerdown', function(){
+      hold=setTimeout(function(){
+        hold=null; b._lp=true;
+        var key=b.getAttribute('data-app');
+        setPins(getPins().filter(function(x){ return x!==key; }));
+        syncTaskbar();
+        toast('Откреплено от панели задач');
+      }, 550);
+    });
+    b.addEventListener('pointerup', function(){ if(hold){ clearTimeout(hold); hold=null; } });
+    b.addEventListener('pointerleave', function(){ if(hold){ clearTimeout(hold); hold=null; } });
     b.addEventListener('click', function(){
-      var id = b.getAttribute('data-app'), w = wins[id];
+      if (b._lp){ b._lp=false; return; }
+      var id=b.getAttribute('data-app'), w=wins[id];
+      if (id.indexOf('user:')===0){
+        var w2=wins['runapp'];
+        if(!w2) openApp('runapp', id.slice(5));
+        else if(w2.minimized) minimizeWin('runapp');
+        else if(w2.el.classList.contains('focused')) minimizeWin('runapp');
+        else focusWin('runapp');
+        return;
+      }
       if(!w) openApp(id);
       else if(w.minimized) minimizeWin(id);
       else if(w.el.classList.contains('focused')) minimizeWin(id);
       else focusWin(id);
     });
   })(bs[j]);
-}
-function buildTaskbar(){
+}function buildTaskbar(){
   syncTaskbar();
-  $('#theme-btn').addEventListener('click', function(){ settings.dark=!settings.dark; saveSettings(); });
   if (navigator.getBattery) navigator.getBattery().then(function(b){
     function up(){
       var pc = Math.round(b.level*100);
@@ -553,10 +620,15 @@ function renderMenu(){
    +'<button class="tb-btn" id="pwr" title="Выключение">'+IC.power+'</button></footer>';
   var grid = m.querySelector('#menu-grid');
   var tab = 'sys';
-  function addTile(name, icon, fn){
+  function addTile(name, icon, key, fn){
     var t=document.createElement('div'); t.className='tile';
     t.innerHTML='<div class="ic">'+icon+'</div>'+name;
-    t.addEventListener('click', fn);
+    t.addEventListener('click', function(){ if (t._suppress){ t._suppress=false; return; } fn(); });
+    t.addEventListener('pointerdown', function(e){
+      var hold=setTimeout(function(){ t._suppress=true; tileCtx(e.clientX, e.clientY, key); }, 450);
+      t.addEventListener('pointerup', function(){ clearTimeout(hold); }, {once:true});
+      t.addEventListener('pointerleave', function(){ clearTimeout(hold); }, {once:true});
+    });
     grid.appendChild(t);
   }
   function draw(q){
@@ -567,14 +639,14 @@ function renderMenu(){
       ins.forEach(function(a){
         if (q && a.name.toLowerCase().indexOf(q)<0) return;
         found++;
-        addTile(esc(a.name), IC.apps, function(){ openApp('runapp', a.path); toggleMenu(); });
+        addTile(esc(a.name), IC.apps, 'user:'+a.path, function(){ openApp('runapp', a.path); toggleMenu(); });
       });
       appList().forEach(function(pp){
         if (ins.some(function(x){ return x.path===pp; })) return;
         var nm=pp.split('/').pop().replace(/\.html?$/i,'');
         if (q && nm.toLowerCase().indexOf(q)<0) return;
         found++;
-        addTile(esc(nm), IC.apps, function(){ openApp('runapp', pp); toggleMenu(); });
+        addTile(esc(nm), IC.apps, 'user:'+pp, function(){ openApp('runapp', pp); toggleMenu(); });
       });
       if (!found) grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:26px 0 10px">Пока нет своих приложений.<br>Создай в редакторе кода, сгенерируй в ИИ-чате<br>или установи с планшета в Моих приложениях.</div>';
       return;
@@ -583,7 +655,7 @@ function renderMenu(){
       if (a.hidden) return;
       if (a.title.toLowerCase().indexOf(q)<0) return;
       found++;
-      addTile(a.title, a.icon, function(){ openApp(a.id); toggleMenu(); });
+      addTile(a.title, a.icon, a.id, function(){ openApp(a.id); toggleMenu(); });
     })(APPS[i]);
     if(!found) grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px 0">Ничего не найдено</div>';
   }
