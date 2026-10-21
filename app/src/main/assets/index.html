@@ -248,7 +248,7 @@ function seedFS(){
 function saveFS(){ lsSet('zikos_fs', JSON.stringify(fs)); }
 function norm(p){ var out=[], segs=String(p||'').split('/'); for (var i=0;i<segs.length;i++){ var s=segs[i]; if(!s||s==='.')continue; if(s==='..'){out.pop();continue;} out.push(s);} return out.join('/'); }
 function ensureParents(p){ var parts=p.split('/'); parts.pop(); var cur=''; for (var i=0;i<parts.length;i++){ if(i>0) cur+='/'; cur+=parts[i]; if(!fs[cur]) fs[cur]={t:'d'}; } }
-function isDir(p){ return !!fs[p] && fs[p].t==='d'; }
+function isDir(p){ return p==='' ? true : (!!fs[p] && fs[p].t==='d'); }
 function fsWrite(p,c){ p=norm(p); ensureParents(p); fs[p]={t:'f',c:c}; saveFS(); }
 function fsMkdir(p){ p=norm(p); ensureParents(p); fs[p]={t:'d'}; saveFS(); }
 function fsDelete(p){ p=norm(p); if(p==='')return; delete fs[p]; var pre=p+'/', ks=Object.keys(fs); for (var i=0;i<ks.length;i++) if(ks[i].indexOf(pre)===0) delete fs[ks[i]]; saveFS(); }
@@ -530,7 +530,8 @@ function renderTerminal(root){
         out.textContent+='Доступные команды:\n  ls, cd, pwd, cat, mkdir, touch, rm, tree — файлы\n  echo, clear, date, whoami, uname, neofetch, uptime\n  open <files|terminal|code|converter|settings>\n'; break;
       case 'ls': {
         var t = args.length ? abs(args[0]) : cwd;
-        if (!isDir(t)) out.textContent += 'ls: не найдено: '+(args[0]||'.')+'\n';
+        if (fs[t] && fs[t].t==='f') out.textContent += (args[0]||t)+'\n';
+        else if (!isDir(t)) out.textContent += 'ls: не найдено: '+(args[0]||'.')+'\n';
         else { var items=fsList(t); out.textContent += items.length ? items.map(function(i){return i.name+(i.dir?'/':'');}).join('   ')+'\n' : '(пусто)\n'; }
         break; }
       case 'cd': {
