@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.StatFs;
+import android.net.Uri;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
 import org.json.JSONObject;
@@ -62,6 +63,13 @@ public class MainActivity extends Activity {
                 return o.toString();
             } catch (Exception e) {
                 return "{}";
+            }
+        }
+        @JavascriptInterface
+        public void openUrl(String url) {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            } catch (Exception e) {
             }
         }
     }

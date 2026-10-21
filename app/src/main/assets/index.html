@@ -26,7 +26,7 @@ button { font-family:inherit; }
 
 #os { position:fixed; inset:0; display:none; background:linear-gradient(135deg,#0B1220,#1E293B 55%,#312E81); }
 #os::before { content:''; position:absolute; inset:0; background-image:linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size:46px 46px; pointer-events:none; }
-#desk-icons { position:absolute; top:10px; left:10px; display:flex; flex-flow:column wrap; gap:10px; max-height:calc(100% - 70px); }
+#desk-icons { position:absolute; top:10px; left:10px; display:flex; flex-flow:column wrap; gap:10px; max-height:calc(100% - 70px); z-index:4; }
 .dicon { width:84px; text-align:center; border-radius:12px; padding:8px; cursor:pointer; }
 .dicon:active { background:rgba(255,255,255,.12); }
 .dicon .ic { width:48px; height:48px; margin:0 auto; border-radius:12px; background:rgba(15,20,30,.55); display:flex; align-items:center; justify-content:center; }
@@ -203,6 +203,9 @@ textarea.ta { width:100%; min-height:84px; background:var(--card); color:var(--t
 .bar2 { height:6px; border-radius:3px; background:var(--outline); overflow:hidden; margin-top:6px; }
 .bar2 i { display:block; height:100%; background:var(--accent); border-radius:3px; }
 
+.br-bar { display:flex; gap:6px; padding:6px 8px; align-items:center; flex-shrink:0; }
+.br-url { flex:1; background:var(--card); border:1px solid var(--outline); border-radius:8px; color:var(--text); font-size:13px; padding:8px 10px; outline:none; min-width:0; }
+.br-frame { flex:1; border:0; background:#fff; min-height:0; }
 </style>
 </head>
 <body>
@@ -251,6 +254,7 @@ var IC = {
   newfile:'<svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 14h-3v3h-2v-3H8v-2h3v-3h2v3h3v2zm-3-7V3.5L18.5 9H13z"/></svg>',
   grok:'<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM7 9h10v2H7V9zm7 5H7v-2h7v2zm3-6H7V6h10v2z"/></svg>',
   mypc:'<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v9c0 1.1-.9 2-2 2h-6v2h2v2H8v-2h2v-2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm0 2v9h16V6H4z"/></svg>',
+  browser:'<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>',
   notes:'<svg viewBox="0 0 24 24"><path d="M19 3H4.99C3.88 3 3 3.9 3 5v14c0 1.1.88 2 1.99 2H19c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 12h-4c0 1.1-.9 2-2 2s-2-.9-2-2H4.99V5H19v10z"/><path d="M7 9h10V7.5H7V9zm0 3h7v-1.5H7V12z"/></svg>',
   sun:'<svg viewBox="0 0 24 24"><path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm13-9.5h-2v3h2V1zm-6.76 3.34L8.45 3.05 7.04 4.46l1.79 1.79 1.41-1.41zM20.5 10.5H21v2h-3v-2h2.5zm-1.69-5.04l1.41-1.41-1.79-1.8-1.42 1.42 1.8 1.79zM18 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0zm-6 4.5A4.5 4.5 0 1 0 7.5 12 4.5 4.5 0 0 0 12 16.5z"/></svg>',
   moon:'<svg viewBox="0 0 24 24"><path d="M9.37 5.51A7.35 7.35 0 0 0 9.1 7.5c0 4.08 3.32 7.4 7.4 7.4.68 0 1.35-.09 1.99-.27A7.014 7.014 0 0 1 12 19c-3.86 0-7-3.14-7-7 0-2.93 1.81-5.45 4.37-6.49z"/></svg>'
@@ -315,6 +319,7 @@ var APPS = [
   {id:'notes', title:'Блокнот', w:640, h:520, icon:IC.notes, render:renderNotes},
   {id:'grok', title:'ИИ-чат', w:720, h:580, icon:IC.grok, render:renderGrok},
   {id:'mypc', title:'Мой компьютер', w:640, h:560, icon:IC.mypc, render:renderSys},
+  {id:'browser', title:'Браузер', w:900, h:640, icon:IC.browser, render:renderBrowser},
   {id:'settings', title:'Настройки', w:560, h:540, icon:IC.settings, render:renderSettings}
 ];
 function appById(id){ for (var i=0;i<APPS.length;i++) if(APPS[i].id===id) return APPS[i]; return null; }
@@ -578,7 +583,7 @@ function renderTerminal(root){
     if (!cmd){ scrollBottom(); return; }
     switch(cmd){
       case 'help':
-        out.textContent+='Доступные команды:\n  ls, cd, pwd, cat, mkdir, touch, rm, tree — файлы\n  echo, clear, date, whoami, uname, neofetch, uptime\n  open <files|terminal|code|converter|notes|grok|mypc|settings>\n'; break;
+        out.textContent+='Доступные команды:\n  ls, cd, pwd, cat, mkdir, touch, rm, tree — файлы\n  echo, clear, date, whoami, uname, neofetch, uptime\n  open <files|terminal|code|converter|notes|grok|mypc|browser|settings>\n'; break;
       case 'ls': {
         var t = args.length ? abs(args[0]) : cwd;
         if (fs[t] && fs[t].t==='f') out.textContent += (args[0]||t)+'\n';
@@ -961,7 +966,9 @@ function renderNotes(root){
     if (st.cur==null){ toast('Сначала выберите заметку'); return; }
     var n=notes[st.cur];
     var name=(titleOf(n).replace(/[\\/:*?"<>|]/g,'_').slice(0,20))||'note';
-    var p='notes/'+name+'.txt';
+    var t=(n.text||'');
+    var isHtml = /^\s*(<!doctype\s+html|<html|<head|<body)/i.test(t) || (/<body[\s>]/i.test(t) && /<\/body>/i.test(t));
+    var p='notes/'+name+(isHtml ? '.html' : '.txt');
     if (fs[p]) p='notes/'+name+'-'+(Date.now()%10000)+'.txt';
     fsWrite(p, n.text||'');
     toast('Сохранено: '+p);
@@ -1144,6 +1151,54 @@ function renderSys(root){
   }
   root.querySelector('#pc-refresh').addEventListener('click', refresh);
   refresh();
+}
+
+// ---------- браузер ----------
+function renderBrowser(root){
+  var cur = '';
+  root.innerHTML = '<div class="br-bar">'
+   +'<button class="chip" id="br-home">&#8962;</button>'
+   +'<input id="br-url" class="br-url" placeholder="адрес или поиск...">'
+   +'<button class="chip" id="br-go">&#8594;</button>'
+   +'<button class="chip" id="br-ext" title="Открыть во внешнем браузере">&#8599;</button></div>'
+   +'<div id="br-panel" style="flex:1;overflow-y:auto;padding:26px;text-align:center">'
+   +'<div style="font-size:12px;color:var(--muted);margin-bottom:14px">Не все сайты разрешают встраивание. Если страница пустая — жми &#8599;, и она откроется снаружи.</div>'
+   +'<div id="br-links" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:540px;margin:0 auto"></div>'
+   +'</div>'
+   +'<iframe id="br-frame" class="br-frame" style="display:none"></iframe>';
+  var fr = root.querySelector('#br-frame'), urlIn = root.querySelector('#br-url'), panel = root.querySelector('#br-panel');
+  var LINKS = [
+    ['Википедия','https://ru.wikipedia.org/wiki/Заглавная_страница'],
+    ['Словарь','https://ru.wiktionary.org'],
+    ['Викиучебник','https://ru.wikibooks.org'],
+    ['Викиновости','https://ru.wikinews.org'],
+    ['Библиотека','https://ru.wikisource.org'],
+    ['Base44','https://app.base44.com'],
+    ['GitHub','https://github.com']
+  ];
+  function norm(u){
+    u = (u||'').trim();
+    if (!u) return '';
+    if (/^https?:\/\//i.test(u)) return u;
+    if (/^[\w-]+(\.[\w-]+)+([\/?#].*)?$/.test(u)) return 'https://' + u;
+    return 'https://ru.wikipedia.org/w/index.php?search=' + encodeURIComponent(u);
+  }
+  function open(u){ cur=u; fr.src=u; fr.style.display='block'; panel.style.display='none'; urlIn.value=u; }
+  function external(u){
+    if (!u) return;
+    if (window.zikBridge && zikBridge.openUrl) zikBridge.openUrl(u);
+    else window.open(u, '_blank');
+  }
+  var links = root.querySelector('#br-links');
+  LINKS.forEach(function(L){
+    var b=document.createElement('button'); b.className='chip'; b.textContent=L[0];
+    b.addEventListener('click', function(){ open(L[1]); });
+    links.appendChild(b);
+  });
+  root.querySelector('#br-home').addEventListener('click', function(){ fr.src='about:blank'; fr.style.display='none'; panel.style.display='block'; urlIn.value=''; cur=''; });
+  root.querySelector('#br-go').addEventListener('click', function(){ var u=norm(urlIn.value); if (u) open(u); });
+  root.querySelector('#br-ext').addEventListener('click', function(){ external(cur || norm(urlIn.value)); });
+  urlIn.addEventListener('keydown', function(e){ if (e.key==='Enter'){ var u=norm(urlIn.value); if (u) open(u); } });
 }
 
 // ---------- загрузка ----------
