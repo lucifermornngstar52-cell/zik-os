@@ -18,7 +18,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".KeyboardActivity" android:exported="true" android:windowSoftInputMode="stateHidden" />
+        <activity android:name=".KeyboardActivity" android:exported="true" android:screenOrientation="sensorLandscape" android:windowSoftInputMode="stateHidden" />
         <activity android:name=".MouseActivity" android:exported="true" />
     </application>
 </manifest>
