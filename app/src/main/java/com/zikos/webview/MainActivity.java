@@ -20,6 +20,17 @@ import java.io.InputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import org.json.JSONObject;
+import org.json.JSONArray;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
+import java.util.List;
+import java.util.ArrayList;
+import android.content.pm.ResolveInfo;
+import android.content.pm.PackageManager;
+import android.Manifest;
+import java.util.Collections;
+import java.util.Comparator;
 
 public class MainActivity extends Activity {
 
@@ -161,6 +172,115 @@ public class MainActivity extends Activity {
                 return "{}";
             }
         }
+        @JavascriptInterface
+        public String listApps() {
+            try {
+                Intent main = new Intent(Intent.ACTION_MAIN);
+                main.addCategory(Intent.CATEGORY_LAUNCHER);
+                List<ResolveInfo> pkgs = getPackageManager().queryIntentActivities(main, 0);
+                JSONArray arr = new JSONArray();
+                for (ResolveInfo r : pkgs) {
+                    JSONObject o = new JSONObject();
+                    o.put("name", String.valueOf(r.loadLabel(getPackageManager())));
+                    o.put("pkg", r.activityInfo.packageName);
+                    arr.put(o);
+                }
+                return arr.toString();
+            } catch (Exception e) {
+                return "[]";
+            }
+        }
+
+        @JavascriptInterface
+        public String launchApp(String pkg) {
+            try {
+                Intent i = getPackageManager().getLaunchIntentForPackage(pkg);
+                if (i != null) {
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(i);
+                    return "ok";
+                }
+                return "no";
+            } catch (Exception e) {
+                return "err";
+            }
+        }
+
+        @JavascriptInterface
+        public boolean hasPerm() {
+            return checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+        }
+
+        @JavascriptInterface
+        public void askPerm() {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, 7);
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public String listDir(String path) {
+            try {
+                File f = new File(path);
+                JSONArray arr = new JSONArray();
+                File[] files = f.listFiles();
+                if (files == null) return "[]";
+                List<File> lst = new ArrayList<File>();
+                for (File c : files) lst.add(c);
+                Collections.sort(lst, new Comparator<File>() {
+                    @Override
+                    public int compare(File a, File b) {
+                        if (a.isDirectory() != b.isDirectory()) return a.isDirectory() ? -1 : 1;
+                        return a.getName().toLowerCase().compareTo(b.getName().toLowerCase());
+                    }
+                });
+                for (File c : lst) {
+                    JSONObject o = new JSONObject();
+                    o.put("name", c.getName());
+                    o.put("path", c.getAbsolutePath());
+                    o.put("dir", c.isDirectory());
+                    o.put("size", c.length());
+                    arr.put(o);
+                }
+                return arr.toString();
+            } catch (Exception e) {
+                return "[]";
+            }
+        }
+
+        @JavascriptInterface
+        public String readText(String path) {
+            try {
+                FileInputStream fis = new FileInputStream(path);
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = fis.read(buf)) > 0 && bos.size() < 4 * 1024 * 1024) bos.write(buf, 0, n);
+                fis.close();
+                return bos.toString("UTF-8");
+            } catch (Exception e) {
+                return "__error__";
+            }
+        }
+
+        @JavascriptInterface
+        public String saveText(String path, String data) {
+            try {
+                File f = new File(path);
+                File dir = f.getParentFile();
+                if (dir != null) dir.mkdirs();
+                FileWriter w = new FileWriter(f);
+                w.write(data);
+                w.close();
+                return "ok";
+            } catch (Exception e) {
+                return "err";
+            }
+        }
+
         @JavascriptInterface
         public void openUrl(String url) {
             try {
