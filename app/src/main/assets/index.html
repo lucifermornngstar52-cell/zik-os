@@ -646,7 +646,11 @@ function renderCode(root, path){
   var st = root._codeState || (root._codeState = {path:null, lang:'txt', preview:false});
   if (path){ st.path = norm(path); st.lang = langOf(st.path); st.preview = false; }
   function langOf(p){ var e=(p||'').split('.').pop().toLowerCase(); return ['html','js','css','py','dart','json'].indexOf(e)>=0 ? e : 'txt'; }
-  var content = (st.path && fs[st.path] && fs[st.path].t==='f') ? fs[st.path].c : '';
+  var content;
+  if (path && st.path && fs[st.path] && fs[st.path].t==='f') content = fs[st.path].c;
+  else if (path) content = '';
+  else content = st.content || '';
+  st.content = content;
   root.innerHTML = '<div class="e-bar"><span class="fn"></span>'
    +'<select><option value="html">HTML</option><option value="js">JS</option><option value="css">CSS</option><option value="py">Python</option><option value="dart">Dart</option><option value="json">JSON</option><option value="txt">Текст</option></select>'
    +'<button class="e-prev-btn">'+(st.preview?'Код':'Превью')+'</button><button class="e-save">Сохранить</button></div>'
@@ -655,14 +659,14 @@ function renderCode(root, path){
    +'<div class="e-stat"></div>';
   var fnEl = root.querySelector('.fn'), stat = root.querySelector('.e-stat'), sel = root.querySelector('select');
   sel.value = st.lang;
-  var dirty = false;
+  var dirty = !!st.dirty;
   function updateHead(){ fnEl.textContent = (st.path||'Без имени')+(dirty?' *':''); stat.textContent = st.lang.toUpperCase()+' · '+content.split('\n').length+' строк'+(dirty?' · не сохранено':''); }
   function save(){
     var p = st.path;
     if (!p){ askText('Имя файла (в projects/)', 'index.html').then(function(n){ if(!n||!n.trim())return; doSave(norm('projects/'+n.trim())); }); }
     else doSave(p);
   }
-  function doSave(p){ fsWrite(p, content); st.path=p; st.lang=langOf(p); sel.value=st.lang; dirty=false; updateHead(); toast('Сохранено: '+p); }
+  function doSave(p){ fsWrite(p, content); st.content=content; st.path=p; st.lang=langOf(p); sel.value=st.lang; dirty=false; st.dirty=false; updateHead(); toast('Сохранено: '+p); }
   root.querySelector('.e-save').onclick = save;
   root.querySelector('.e-prev-btn').onclick = function(){
     if (!st.preview && st.lang!=='html'){ toast('Превью доступно для HTML'); return; }
@@ -674,13 +678,14 @@ function renderCode(root, path){
     ta.value = content;
     function paint(){
       content = ta.value;
+      st.content = content;
       hlEl.innerHTML = hl(content, st.lang)+'\n';
       var n = content.split('\n').length, g='';
       for (var i=1;i<=n;i++) g += i+'\n';
       gut.textContent = g;
       updateHead();
     }
-    ta.addEventListener('input', function(){ dirty=true; paint(); });
+    ta.addEventListener('input', function(){ dirty=true; st.dirty=true; paint(); });
     ta.onscroll = function(){ hlEl.scrollTop=ta.scrollTop; hlEl.scrollLeft=ta.scrollLeft; gut.scrollTop=ta.scrollTop; };
     paint();
     ta.focus();
