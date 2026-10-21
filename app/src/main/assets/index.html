@@ -1645,9 +1645,12 @@ function startBuild(htmlPath){
       else if (k===htmlPath) files.push({p:'site/'+k.split('/').pop(), c:fs[k].c});
     }
     if (!files.length){ toast('Нечего собирать'); return; }
-    var hasIdx = files.some(function(f){ return /index\.html?$/i.test(f.p); });
-    if (!hasIdx){ toast('В проекте нет index.html'); return; }
-    BUILD_STATE = { status:'upload', name: dir? dir.split('/').pop() : 'app', links:[], started: Date.now() };
+    var entryRel = dir ? htmlPath.slice(dir.length+1) : htmlPath.split('/').pop();
+    if (entryRel !== 'index.html') files = files.filter(function(f){ return f.p !== 'site/index.html'; });
+    var entry = files.filter(function(f){ return f.p === 'site/'+entryRel; })[0];
+    if (entry){ entry.p = 'site/index.html'; }
+    else if (!files.some(function(f){ return f.p === 'site/index.html'; })){ toast('Не найден входной html'); return; }
+    BUILD_STATE = { status:'upload', name: (dir ? dir.split('/').pop() : entryRel.replace(/\.html?$/i,'')), links:[], started: Date.now() };
     openApp('apps');
     toast('Загружаю в облако...');
     ghApi('GET','/repos/'+BUILDER+'/git/trees/main?recursive=1',null).then(function(t){
