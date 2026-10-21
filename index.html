@@ -230,6 +230,9 @@ textarea.ta { width:100%; min-height:84px; background:var(--card); color:var(--t
 #grid-overlay { display:none; position:fixed; inset:0; pointer-events:none; background-image:linear-gradient(rgba(120,160,255,.09) 1px, transparent 1px), linear-gradient(90deg, rgba(120,160,255,.09) 1px, transparent 1px); background-size:94px 95px; background-position:10px 10px; }
 .dicon { transition:transform .12s, filter .12s; }
 .dicon.held { transform:scale(1.14); filter:brightness(1.3); }
+.mtabs { display:flex; gap:6px; padding:0 16px 10px; }
+.mtab { flex:1; border:0; background:rgba(255,255,255,.06); color:var(--text); font:inherit; font-size:13px; padding:8px; border-radius:9px; cursor:pointer; }
+.mtab.active { background:var(--accent); color:#fff; }
 </style>
 </head>
 <body>
@@ -528,34 +531,58 @@ function buildDeskIcons(){
 function renderMenu(){
   var m = $('#menu');
   m.innerHTML = '<div class="search">'+IC.search+'<input id="menu-q" placeholder="Поиск приложений"></div>'
-   +'<div class="label">Закреплено</div><div class="grid" id="menu-grid"></div>'
-   +'<footer><div class="ava">z</div><div class="who">zik<small>zik@zikos · HikariOS 2.0</small></div>'
+   +'<div class="mtabs"><button class="mtab active" id="mtab-sys">Рабочий стол</button><button class="mtab" id="mtab-mine">Мои приложения</button></div>'
+   +'<div class="grid" id="menu-grid"></div>'
+   +'<footer><div class="ava">H</div><div class="who">hikari<small>user@hikarios · HikariOS 2.5</small></div>'
    +'<button class="tb-btn" id="pwr" title="Выключение">'+IC.power+'</button></footer>';
   var grid = m.querySelector('#menu-grid');
+  var tab = 'sys';
+  function addTile(name, icon, fn){
+    var t=document.createElement('div'); t.className='tile';
+    t.innerHTML='<div class="ic">'+icon+'</div>'+name;
+    t.addEventListener('click', fn);
+    grid.appendChild(t);
+  }
   function draw(q){
     grid.innerHTML='';
     var found=0;
-    installedApps().forEach(function(a){
-      if (q && a.name.toLowerCase().indexOf(q)<0) return;
-      var t2=document.createElement('div'); t2.className='tile';
-      t2.innerHTML='<div class="ic">'+IC.apps+'</div>'+esc(a.name);
-      t2.addEventListener('click', function(){ openApp('runapp', a.path); toggleMenu(); });
-      grid.appendChild(t2);
-    });
+    if (tab==='mine'){
+      var ins = installedApps();
+      ins.forEach(function(a){
+        if (q && a.name.toLowerCase().indexOf(q)<0) return;
+        found++;
+        addTile(esc(a.name), IC.apps, function(){ openApp('runapp', a.path); toggleMenu(); });
+      });
+      appList().forEach(function(pp){
+        if (ins.some(function(x){ return x.path===pp; })) return;
+        var nm=pp.split('/').pop().replace(/\.html?$/i,'');
+        if (q && nm.toLowerCase().indexOf(q)<0) return;
+        found++;
+        addTile(esc(nm), IC.apps, function(){ openApp('runapp', pp); toggleMenu(); });
+      });
+      if (!found) grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:26px 0 10px">Пока нет своих приложений.<br>Создай в редакторе кода, сгенерируй в ИИ-чате<br>или установи с планшета в Моих приложениях.</div>';
+      return;
+    }
     for (var i=0;i<APPS.length;i++)(function(a){
       if (a.hidden) return;
       if (a.title.toLowerCase().indexOf(q)<0) return;
       found++;
-      var t=document.createElement('div'); t.className='tile';
-      t.innerHTML='<div class="ic">'+a.icon+'</div>'+a.title;
-      t.addEventListener('click', function(){ openApp(a.id); toggleMenu(); });
-      grid.appendChild(t);
+      addTile(a.title, a.icon, function(){ openApp(a.id); toggleMenu(); });
     })(APPS[i]);
     if(!found) grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px 0">Ничего не найдено</div>';
   }
   draw('');
+  function setTab(t2){
+    tab = t2;
+    m.querySelector('#mtab-sys').classList.toggle('active', t2==='sys');
+    m.querySelector('#mtab-mine').classList.toggle('active', t2==='mine');
+    draw((m.querySelector('#menu-q').value||'').toLowerCase());
+  }
+  m.querySelector('#mtab-sys').onclick=function(){ setTab('sys'); };
+  m.querySelector('#mtab-mine').onclick=function(){ setTab('mine'); };
   m.querySelector('#menu-q').addEventListener('input', function(e){ draw(e.target.value.toLowerCase()); });
   m.querySelector('#pwr').addEventListener('click', function(){ $('#shutdown').classList.remove('hidden'); });
+}
 }
 function tick(){
   var d=new Date();
