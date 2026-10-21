@@ -30,7 +30,7 @@ public class KeyboardActivity extends Activity {
     private void sendKey(String ch) { if (!RemoteLink.send("k:" + ch)) status.setText("нет связи — коснись"); }
     private void sendSp(String k) { if (!RemoteLink.send(k)) status.setText("нет связи — коснись"); }
 
-    private Button keyBtn(String text, float size, int weight) {
+    private Button keyBtn(String text, float size, float weight) {
         Button b = new Button(this);
         b.setText(text);
         b.setAllCaps(false);
