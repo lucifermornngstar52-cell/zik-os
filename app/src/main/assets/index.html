@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>ZikOS</title>
+<title>HikariOS</title>
 <style>
 :root { --accent:#3B82F6; }
 * { box-sizing:border-box; margin:0; padding:0; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
@@ -15,7 +15,9 @@ input, textarea { -webkit-user-select:text; user-select:text; }
 button { font-family:inherit; }
 .hidden { display:none !important; }
 
-#boot { position:fixed; inset:0; background:#000; padding:28px; z-index:999; display:flex; flex-direction:column; }
+#boot { position:fixed; inset:0; background:#000; padding:28px; z-index:999; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+#boot .splash { width:min(440px, 74vw); border-radius:20px; display:block; margin-bottom:20px; box-shadow:0 0 70px rgba(77,111,255,.45); }
+#boot .lines { font:13px/1.7 monospace; color:#7DE3A3; white-space:pre-wrap; flex:1; overflow:hidden; }
 #boot .logo { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
 #boot .logo .z { width:34px; height:34px; border-radius:9px; background:var(--accent); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:20px; }
 #boot .logo b { color:#fff; font-size:20px; letter-spacing:2px; font-weight:600; }
@@ -230,7 +232,7 @@ textarea.ta { width:100%; min-height:84px; background:var(--card); color:var(--t
 </head>
 <body>
 <div id="boot">
-  <div class="logo"><div class="z">Z</div><b>ZikOS</b></div>
+  <img class="splash" src="splash.jpg" alt="">
   <div class="lines" id="boot-lines"></div>
   <div class="bar"><i id="boot-bar" style="width:0%"></i></div>
   <div class="hint">Нажмите в любом месте, чтобы пропустить</div>
@@ -281,7 +283,7 @@ var IC = {
   moon:'<svg viewBox="0 0 24 24"><path d="M9.37 5.51A7.35 7.35 0 0 0 9.1 7.5c0 4.08 3.32 7.4 7.4 7.4.68 0 1.35-.09 1.99-.27A7.014 7.014 0 0 1 12 19c-3.86 0-7-3.14-7-7 0-2.93 1.81-5.45 4.37-6.49z"/></svg>'
 };
 
-var DEMO_HTML = '<!DOCTYPE html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n<title>ZikOS Demo<\/title>\n<style>\nbody { font-family: sans-serif; background: linear-gradient(135deg, #0f172a, #312e81); color: #e2e8f0; display: flex; min-height: 100vh; align-items: center; justify-content: center; margin:0; }\n.card { background: rgba(255,255,255,.06); padding: 32px 40px; border-radius: 16px; text-align: center; }\nh1 { color: #93c5fd; margin: 0 0 8px; }\nbutton { margin-top: 16px; padding: 10px 22px; border: 0; border-radius: 10px; background: #3b82f6; color: white; font-size: 15px; }\np { margin: 6px 0; }\n<\/style>\n<\/head>\n<body>\n<div class="card">\n<h1>Привет из ZikOS!<\/h1>\n<p>Это живой предпросмотр HTML прямо на планшете.<\/p>\n<button onclick="onClick()">Нажми меня<\/button>\n<p id="out"><\/p>\n<\/div>\n<script>\nfunction onClick() { document.getElementById("out").textContent = "JS работает! " + new Date().toLocaleTimeString(); }\n<\/script>\n<\/body>\n<\/html>';
+var DEMO_HTML = '<!DOCTYPE html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n<title>HikariOS Demo<\/title>\n<style>\nbody { font-family: sans-serif; background: linear-gradient(135deg, #0f172a, #312e81); color: #e2e8f0; display: flex; min-height: 100vh; align-items: center; justify-content: center; margin:0; }\n.card { background: rgba(255,255,255,.06); padding: 32px 40px; border-radius: 16px; text-align: center; }\nh1 { color: #93c5fd; margin: 0 0 8px; }\nbutton { margin-top: 16px; padding: 10px 22px; border: 0; border-radius: 10px; background: #3b82f6; color: white; font-size: 15px; }\np { margin: 6px 0; }\n<\/style>\n<\/head>\n<body>\n<div class="card">\n<h1>Привет из HikariOS!<\/h1>\n<p>Это живой предпросмотр HTML прямо на планшете.<\/p>\n<button onclick="onClick()">Нажми меня<\/button>\n<p id="out"><\/p>\n<\/div>\n<script>\nfunction onClick() { document.getElementById("out").textContent = "JS работает! " + new Date().toLocaleTimeString(); }\n<\/script>\n<\/body>\n<\/html>';
 
 // ---------- настройки ----------
 var ACCENTS = ['#3B82F6','#8B5CF6','#10B981','#F59E0B','#EF4444','#06B6D4','#EC4899','#84CC16','#F97316','#A855F7'];
@@ -315,10 +317,10 @@ var fs = JSON.parse(lsGet('zikos_fs')||'null');
 if (!fs) { fs = seedFS(); saveFS(); }
 function seedFS(){
   var f = {};
-  f['readme.txt']={t:'f',c:'ZikOS 1.0.0 — мини-ОС для планшета.\n\nЭто твой домашний каталог (/home).\nТерминал, файлы и редактор кода работают с одними и теми же файлами.\nПапка projects — для кода. Открой projects/demo.html в «Код» и нажми «Превью».\n'};
+  f['readme.txt']={t:'f',c:'HikariOS 2.0 — мини-ОС для планшета.\n\nЭто твой домашний каталог (/home).\nТерминал, файлы и редактор кода работают с одними и теми же файлами.\nПапка projects — для кода. Открой projects/demo.html в «Код» и нажми «Превью».\n'};
   f['projects']={t:'d'};
   f['projects/demo.html']={t:'f',c:DEMO_HTML};
-  f['projects/hello.py']={t:'f',c:'# ZikOS поддерживает подсветку синтаксиса\ndef hello():\n    print("Привет из ZikOS!")\n\nhello()\n'};
+  f['projects/hello.py']={t:'f',c:'# HikariOS поддерживает подсветку синтаксиса\ndef hello():\n    print("Привет из HikariOS!")\n\nhello()\n'};
   return f;
 }
 function saveFS(){ lsSet('zikos_fs', JSON.stringify(fs)); }
@@ -508,7 +510,7 @@ function renderMenu(){
   var m = $('#menu');
   m.innerHTML = '<div class="search">'+IC.search+'<input id="menu-q" placeholder="Поиск приложений"></div>'
    +'<div class="label">Закреплено</div><div class="grid" id="menu-grid"></div>'
-   +'<footer><div class="ava">z</div><div class="who">zik<small>zik@zikos · ZikOS 1.0.0</small></div>'
+   +'<footer><div class="ava">z</div><div class="who">zik<small>zik@zikos · HikariOS 2.0</small></div>'
    +'<button class="tb-btn" id="pwr" title="Выключение">'+IC.power+'</button></footer>';
   var grid = m.querySelector('#menu-grid');
   function draw(q){
@@ -627,9 +629,9 @@ function renderTerminal(root){
   root.innerHTML='<div class="term"><div class="t-out"></div><div class="t-in"><span class="t-ps"></span><input class="t-i" spellcheck="false" autocomplete="off" autocapitalize="off"></div></div>';
   var out=root.querySelector('.t-out'), ps=root.querySelector('.t-ps'), inp=root.querySelector('.t-i');
   var cwd='', cmdMode=false;
-  function setPs(){ if (cmdMode){ ps.textContent='C:\\ZikOS'+(cwd?'\\'+cwd.replace(/\//g,'\\'):'')+'>'; } else { ps.textContent='zik@zikos:'+(cwd||'~')+'$ '; } }
+  function setPs(){ if (cmdMode){ ps.textContent='C:\\HikariOS'+(cwd?'\\'+cwd.replace(/\//g,'\\'):'')+'>'; } else { ps.textContent='zik@zikos:'+(cwd||'~')+'$ '; } }
   setPs();
-  out.textContent='ZikOS Terminal 1.0.0 — введите help для списка команд.\n\n';
+  out.textContent='HikariOS Terminal 1.0.0 — введите help для списка команд.\n\n';
   root.querySelector('.term').addEventListener('click', function(){ inp.focus(); });
   function scrollBottom(){ out.scrollTop = out.scrollHeight; }
   function abs(p){ p=(p||'').trim(); if(!p) return cwd;
@@ -653,7 +655,7 @@ function renderTerminal(root){
     switch(cmd){
       case 'cmd':
         cmdMode=true; setPs();
-        out.textContent+='Microsoft Windows [Версия 10.0.1027]\n(c) Корпорация Майкрософт. ZikOS Edition.\n\n'; break;
+        out.textContent+='Microsoft Windows [Версия 10.0.1027]\n(c) Корпорация Майкрософт. HikariOS Edition.\n\n'; break;
       case 'exit':
         if (cmdMode){ cmdMode=false; setPs(); } else out.textContent+='Закройте окно крестиком.\n'; break;
       case 'grep': {
@@ -731,12 +733,12 @@ function renderTerminal(root){
       case 'clear': out.textContent=''; break;
       case 'date': out.textContent += new Date().toString()+'\n'; break;
       case 'whoami': out.textContent += 'zik\n'; break;
-      case 'uname': out.textContent += 'ZikOS 1.0.0 zikos-kernel webview\n'; break;
+      case 'uname': out.textContent += 'HikariOS 2.0 zikos-kernel webview\n'; break;
       case 'uptime': { var s=Math.floor((Date.now()-bootT)/1000); out.textContent += 'up '+Math.floor(s/60)+' мин '+(s%60)+' сек\n'; break; }
       case 'neofetch':
         out.textContent += '  #####   ### ###    zik@zikos\n'
           +'  ##  ##  ### ###    -----------------------\n'
-          +'  ##  ##   ##  ##    OS: ZikOS 1.0.0 (WebView)\n'
+          +'  ##  ##   ##  ##    OS: HikariOS 2.0 (WebView)\n'
           +'  #####    ##  ##     Kernel: zikos-web 1.0\n'
           +'  ##      ### ###    Device: ZIK W1027\n'
           +'  ##      ### ###    Memory: 2048 MiB\n';
@@ -1172,7 +1174,7 @@ function renderSettings(root){
    +'<div class="s-card"><h3>Акцентный цвет</h3><div class="swatches" id="s-acc"></div></div>'
    +'<div class="s-card"><h3>Оформление</h3><div class="tgl-row"><span>Тёмная тема</span><div class="tgl" id="s-dark"></div></div></div>'
    +'<div class="s-card"><h3>О системе</h3>'
-   +'<div class="kv"><span>ОС</span>ZikOS 1.0.0 (WebView Edition)</div>'
+   +'<div class="kv"><span>ОС</span>HikariOS 2.0 (WebView Edition)</div>'
    +'<div class="kv"><span>Устройство</span>ZIK W1027</div>'
    +'<div class="kv"><span>Пользователь</span>zik</div>'
    +'<div class="kv"><span>Движок</span>Chromium WebView</div>'
@@ -1203,7 +1205,7 @@ function fmtDate(d){ function p2(n){ return (n<10?'0':'')+n; } return p2(d.getDa
 function loadNotes(){
   var raw = lsGet('zikos_notes');
   if (raw === null){
-    var seed = [{ text:'Привет! Это Блокнот ZikOS.\nЗаметки хранятся прямо на устройстве и переживают перезапуск.\nКнопка «В файл» копирует заметку в /home/notes/, откуда её видно в Терминале, Файлах и Коде.\n', updated: fmtDate(new Date()) }];
+    var seed = [{ text:'Привет! Это Блокнот HikariOS.\nЗаметки хранятся прямо на устройстве и переживают перезапуск.\nКнопка «В файл» копирует заметку в /home/notes/, откуда её видно в Терминале, Файлах и Коде.\n', updated: fmtDate(new Date()) }];
     lsSet('zikos_notes', JSON.stringify(seed));
     return seed;
   }
@@ -1384,7 +1386,7 @@ function renderGrok(root){
 function fmtBytes(b){ if (b===undefined||b===null||b<0) return '\u2014'; var u=['\u0411','\u041a\u0411','\u041c\u0411','\u0413\u0411','\u0422\u0411']; var i=0; while(b>=1024&&i<u.length-1){ b/=1024; i++; } return (b>=100? Math.round(b) : Math.round(b*10)/10)+' '+u[i]; }
 function renderSys(root){
   root.innerHTML = '<div style="flex:1;overflow-y:auto">'
-   +'<div class="pc-head"><div class="big">'+IC.mypc+'</div><div><h3 id="pc-name">Мой компьютер</h3><small>ZikOS 1.0 \u00b7 WebView Edition</small></div></div>'
+   +'<div class="pc-head"><div class="big">'+IC.mypc+'</div><div><h3 id="pc-name">Мой компьютер</h3><small>HikariOS 1.0 \u00b7 WebView Edition</small></div></div>'
    +'<div class="pc-grid" id="pc-grid"></div>'
    +'<div style="padding:0 14px 14px"><button class="chip" id="pc-refresh">Обновить</button></div></div>';
   var grid = root.querySelector('#pc-grid');
@@ -1396,7 +1398,7 @@ function renderSys(root){
     var used = (d.storageTotal||0) - (d.storageAvail||0);
     grid.innerHTML =
       card('\u0423\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u043e', kv('Модель', d.model||'\u2014')+kv('Производитель', d.manufacturer||'\u2014')+kv('Платформа', d.board||'\u2014'))
-    + card('\u0421\u0438\u0441\u0442\u0435\u043c\u0430', kv('Android', d.android||'\u2014')+kv('SDK', d.sdk!==undefined? d.sdk : '\u2014')+kv('ZikOS', '1.0 (WebView)')+kv('Процессор', (d.cores||'?')+' ядер'))
+    + card('\u0421\u0438\u0441\u0442\u0435\u043c\u0430', kv('Android', d.android||'\u2014')+kv('SDK', d.sdk!==undefined? d.sdk : '\u2014')+kv('HikariOS', '1.0 (WebView)')+kv('Процессор', (d.cores||'?')+' ядер'))
     + card('\u041f\u0430\u043c\u044f\u0442\u044c', kv('Всего', fmtBytes(d.ramTotal))+kv('Свободно', fmtBytes(d.ramAvail))+kv('Занято', d.ramAvail>0? ramPct+'%' : '\u2014')+(d.ramAvail>0? '<div class="bar2"><i style="width:'+ramPct+'%"></i></div>' : '')+(d.heap? kv('Куча JS', fmtBytes(d.heap)) : ''))
     + card('\u0425\u0440\u0430\u043d\u0438\u043b\u0438\u0449\u0435', kv('Всего', fmtBytes(d.storageTotal))+kv('Занято', fmtBytes(used))+'<div class="bar2"><i style="width:'+stPct+'%"></i></div>'+kv('Свободно', fmtBytes(d.storageAvail)))
     + card('\u0411\u0430\u0442\u0430\u0440\u0435\u044f', kv('Заряд', (d.battery!==undefined&&d.battery>=0)? d.battery+'%' : '\u2014')+kv('Статус', d.charging? 'заряжается' : 'от батареи')+(d.temp>=0? kv('Температура', d.temp+' \u00b0C') : '')+(d.voltage>0? kv('Напряжение', (d.voltage/1000).toFixed(2)+' В') : ''))
@@ -1810,18 +1812,18 @@ initDeskCtx();
 
 // ---------- загрузка ----------
 var BOOT_LINES = [
-  'ZIK BIOS v2.41 — W1027 Tablet PC',
+  'HIKARI BIOS v2.41 — W1027 Tablet PC',
   'Memory test: 2048 MB ......... OK',
   'Storage: eMMC 32 GB .......... OK',
   'Battery: OK | Backlight: OK',
   '',
-  'Loading zikos-web 1.0.0 ...',
+  'Loading hikari-web 2.0 ...',
   '[ OK ] Mounting /home',
   '[ OK ] Starting window manager',
   '[ OK ] Starting shell services',
   '[ OK ] Loading desktop environment',
   '',
-  'Welcome to ZikOS.'
+  'Welcome to HikariOS.'
 ];
 var booted=false;
 function finishBoot(){ if(booted) return; booted=true; $('#boot').style.display='none'; $('#os').style.display='block'; }

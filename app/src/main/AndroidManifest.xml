@@ -3,8 +3,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:label="ZikOS"
-        android:icon="@drawable/icon"
+        android:label="Hikari OS"
+        android:icon="@drawable/hikari"
         android:hardwareAccelerated="true"
         android:theme="@style/AppTheme">
         <activity
