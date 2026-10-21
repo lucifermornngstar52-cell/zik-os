@@ -81,7 +81,7 @@ public class MainActivity extends Activity {
 
     private void serveBt(BluetoothSocket s) {
         String nm = "";
-        try { nm = String.valueOf(s.getRemoteDevice().getName()).replace("'", "").replace(""", ""); } catch (Exception e) {}
+        try { nm = String.valueOf(s.getRemoteDevice().getName()).replace(String.valueOf((char)39), ""); } catch (Exception e) {}
         js("window.__remoteIn&&window.__remoteIn({t:'st',s:'on',n:'" + nm + "'})");
         try {
             BufferedReader r = new BufferedReader(new InputStreamReader(s.getInputStream(), "UTF-8"));
