@@ -821,7 +821,7 @@ function inlineProj(html, dir){
   });
   return html;
 }
-var TPL_HTML = '<!DOCTYPE html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n<title>Приложение</title>\n<link rel="stylesheet" href="style.css">\n</head>\n<body>\n<div id="app"></div>\n<script src="app.js"></script>\n</body>\n</html>';
+var TPL_HTML = '<!DOCTYPE html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n<title>Приложение</title>\n<link rel="stylesheet" href="style.css">\n</head>\n<body>\n<div id="app"></div>\n<script src="app.js"><\/script>\n</body>\n</html>';
 var TPL_CSS = 'body { margin:0; background:#0d1117; color:#e6edf3; font-family:sans-serif; }\n#app { padding:16px; }';
 var TPL_JS = '// код приложения\nvar app = document.getElementById(\'app\');\napp.textContent = \'Работает!\';';
 var GEN_BUSY = false;
