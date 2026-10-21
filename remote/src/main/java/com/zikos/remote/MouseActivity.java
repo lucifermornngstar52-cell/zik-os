@@ -82,14 +82,14 @@ public class MouseActivity extends Activity {
             @Override public void onClick(View v) {
                 status.setText("подключение...");
                 RemoteLink.connect(MouseActivity.this, new RemoteLink.CB() {
-                    @Override public void state(String s) { status.setText(s.equals("ok") ? "● мышь активна" : "нет связи — коснись"); }
+                    @Override public void state(String s) { status.setText(s.equals("ok") ? "● мышь активна" : (s.equals("noip") ? "планшет не найден — вернись в меню" : "нет связи — коснись")); }
                 });
             }
         });
         root.addView(status, new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.LEFT));
 
         RemoteLink.connect(this, new RemoteLink.CB() {
-            @Override public void state(String s) { status.setText(s.equals("ok") ? "● мышь активна" : "нет связи — коснись"); }
+            @Override public void state(String s) { status.setText(s.equals("ok") ? "● мышь активна" : (s.equals("noip") ? "планшет не найден — вернись в меню" : "нет связи — коснись")); }
         });
     }
 

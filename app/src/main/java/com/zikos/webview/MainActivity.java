@@ -22,6 +22,14 @@ import android.util.Base64;
 import android.content.ContentValues;
 import android.provider.MediaStore;
 import java.io.InputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.DatagramSocket;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.util.Enumeration;
+import android.net.wifi.WifiManager;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStream;
 import org.json.JSONObject;
@@ -44,6 +52,9 @@ public class MainActivity extends Activity {
     private WebView webView = null;
     private volatile boolean btInputOn = false;
     private BluetoothServerSocket btServer = null;
+    private ServerSocket tcpServer = null;
+    private DatagramSocket udpSock = null;
+    private WifiManager.MulticastLock mcastLock = null;
     private static final String BT_UUID = "7d1a4f2e-8c9b-4e5a-9f30-6b1c2d3e4f50";
 
     private void js(final String code) {
@@ -55,8 +66,80 @@ public class MainActivity extends Activity {
 
     private void stopBtInput() {
         try { if (btServer != null) btServer.close(); } catch (Exception e) {}
-        btServer = null;
+        try { if (tcpServer != null) tcpServer.close(); } catch (Exception e) {}
+        try { if (udpSock != null) udpSock.close(); } catch (Exception e) {}
+        try { if (mcastLock != null) mcastLock.release(); } catch (Exception e) {}
+        btServer = null; tcpServer = null; udpSock = null; mcastLock = null;
         js("window.__remoteIn&&window.__remoteIn({t:'st',s:'off'})");
+    }
+
+    private String localIp() {
+        try {
+            Enumeration<NetworkInterface> es = NetworkInterface.getNetworkInterfaces();
+            while (es.hasMoreElements()) {
+                NetworkInterface n = es.nextElement();
+                if (!n.isUp() || n.isLoopback()) continue;
+                Enumeration<InetAddress> as = n.getInetAddresses();
+                while (as.hasMoreElements()) {
+                    InetAddress a = as.nextElement();
+                    if (!a.isLoopbackAddress() && a.getAddress().length == 4) return a.getHostAddress();
+                }
+            }
+        } catch (Exception e) {}
+        return "";
+    }
+
+    private void startTcpInput() {
+        if (tcpServer != null) return;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    ServerSocket ss = new ServerSocket(49998);
+                    tcpServer = ss;
+                    while (btInputOn) {
+                        final Socket s = ss.accept();
+                        if (!btInputOn) { try { s.close(); } catch (Exception e) {} break; }
+                        new Thread(new Runnable() {
+                            @Override public void run() {
+                                try { serveIn(s.getInputStream(), "Wi-Fi " + s.getInetAddress().getHostAddress()); } catch (Exception e) {}
+                            }
+                        }).start();
+                    }
+                } catch (Exception e) {}
+            }
+        }).start();
+    }
+
+    private void startUdpBeacon() {
+        if (udpSock != null) return;
+        try {
+            WifiManager wm = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
+            mcastLock = wm.createMulticastLock("hikariInput");
+            mcastLock.acquire();
+        } catch (Exception e) {}
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    DatagramSocket ds = new DatagramSocket(49999);
+                    udpSock = ds;
+                    ds.setSoTimeout(15000);
+                    byte[] buf = new byte[256];
+                    while (btInputOn) {
+                        DatagramPacket p = new DatagramPacket(buf, buf.length);
+                        try { ds.receive(p); } catch (Exception e) { continue; }
+                        String msg = new String(p.getData(), 0, p.getLength(), "UTF-8");
+                        if (msg.trim().equals("HIKARI_DISCOVER")) {
+                            String reply = "HIKARI:HikariOS:" + localIp() + ":49998";
+                            byte[] out = reply.getBytes("UTF-8");
+                            DatagramPacket rp = new DatagramPacket(out, out.length, p.getAddress(), p.getPort());
+                            try { ds.send(rp); } catch (Exception e) {}
+                        }
+                    }
+                } catch (Exception e) {}
+            }
+        }).start();
     }
 
     private void startBtInput() {
@@ -65,7 +148,7 @@ public class MainActivity extends Activity {
             public void run() {
                 try {
                     final BluetoothAdapter ad = BluetoothAdapter.getDefaultAdapter();
-                    if (ad == null || !ad.isEnabled()) { js("window.__remoteIn&&window.__remoteIn({t:'st',s:'nobt'})"); return; }
+                    if (ad == null || !ad.isEnabled()) return;
                     btServer = ad.listenUsingRfcommWithServiceRecord("Hikari Input", java.util.UUID.fromString(BT_UUID));
                     while (btInputOn) {
                         BluetoothSocket s = btServer.accept();
@@ -82,16 +165,20 @@ public class MainActivity extends Activity {
     private void serveBt(BluetoothSocket s) {
         String nm = "";
         try { nm = String.valueOf(s.getRemoteDevice().getName()).replace(String.valueOf((char)39), ""); } catch (Exception e) {}
+        try { serveIn(s.getInputStream(), nm); } catch (Exception e) {}
+        try { s.close(); } catch (Exception e) {}
+    }
+
+    private void serveIn(InputStream is, String nm) {
         js("window.__remoteIn&&window.__remoteIn({t:'st',s:'on',n:'" + nm + "'})");
         try {
-            BufferedReader r = new BufferedReader(new InputStreamReader(s.getInputStream(), "UTF-8"));
+            BufferedReader r = new BufferedReader(new InputStreamReader(is, "UTF-8"));
             String line;
             while (btInputOn && (line = r.readLine()) != null) {
                 String msg = btParse(line);
                 if (msg != null) js("window.__remoteIn&&window.__remoteIn(" + msg + ")");
             }
         } catch (Exception e) {}
-        try { s.close(); } catch (Exception e) {}
         js("window.__remoteIn&&window.__remoteIn({t:'st',s:'lost'})");
     }
 
@@ -389,7 +476,13 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void setBtInput(final boolean on) {
             btInputOn = on;
-            if (on) startBtInput(); else stopBtInput();
+            if (on) { startTcpInput(); startUdpBeacon(); startBtInput(); }
+            else stopBtInput();
+        }
+
+        @JavascriptInterface
+        public String localIp() {
+            return localIp();
         }
 
         @JavascriptInterface

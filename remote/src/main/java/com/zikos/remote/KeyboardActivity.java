@@ -153,7 +153,7 @@ public class KeyboardActivity extends Activity {
         root.addView(status, slp);
         status.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { status.setText("подключение..."); RemoteLink.connect(KeyboardActivity.this, new RemoteLink.CB() {
-                @Override public void state(String s) { status.setText(s.equals("ok") ? "● " + getSharedPreferences("hikari", 0).getString("name", "") : ("нет связи — коснись (" + s + ")")); }
+                @Override public void state(String s) { status.setText(s.equals("ok") ? "● Wi-Fi" : (s.equals("noip") ? "планшет не найден — вернись в меню" : ("нет связи — коснись (" + s + ")"))); }
             }); }
         });
 
@@ -164,7 +164,7 @@ public class KeyboardActivity extends Activity {
 
         RemoteLink.connect(this, new RemoteLink.CB() {
             @Override public void state(String s) {
-                status.setText(s.equals("ok") ? "● " + getSharedPreferences("hikari", 0).getString("name", "") : "нет связи — коснись");
+                status.setText(s.equals("ok") ? "● Wi-Fi" : (s.equals("noip") ? "планшет не найден — вернись в меню" : "нет связи — коснись"));
             }
         });
     }

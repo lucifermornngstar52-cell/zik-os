@@ -43,7 +43,7 @@ body.light #taskbar { background:rgba(240,243,247,.7); }
 .tb-center #start { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:2; }
 .tb-gleft { position:absolute; right:calc(50% + 34px); top:0; bottom:0; display:flex; align-items:center; gap:4px; max-width:34vw; overflow:hidden; }
 .tb-gright { position:absolute; left:calc(50% + 34px); top:0; bottom:0; display:flex; align-items:center; gap:4px; max-width:34vw; overflow:hidden; }
-body.fs-hide #taskbar { transform:translateY(100%); transition:transform .22s ease; }
+body.fs-hide #taskbar { transform:translateY(calc(100% - 10px)); transition:transform .22s ease; }
 body.fs-hide #taskbar.peek { transform:translateY(0); }
 .tb-btn { width:46px; height:42px; border:0; background:transparent; border-radius:8px; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative; }
 .tb-btn svg { width:20px; height:20px; fill:var(--muted); pointer-events:none; }
@@ -640,7 +640,7 @@ function renderMenu(){
   m.innerHTML = '<div class="search">'+IC.search+'<input id="menu-q" placeholder="Поиск приложений"></div>'
    +'<div class="mtabs"><button class="mtab active" id="mtab-sys">Рабочий стол</button><button class="mtab" id="mtab-mine">Мои приложения</button></div>'
    +'<div class="grid" id="menu-grid"></div>'
-   +'<footer><div class="ava">H</div><div class="who">hikari<small>user@hikarios · HikariOS 3.0</small></div>'
+   +'<footer><div class="ava">H</div><div class="who">hikari<small>user@hikarios · HikariOS 3.1</small></div>'
    +'<button class="tb-btn" id="pwr" title="Выключение">'+IC.power+'</button></footer>';
   var grid = m.querySelector('#menu-grid');
   var tab = 'sys';
@@ -1383,9 +1383,10 @@ function renderSettings(root){
    +'<div class="s-card"><h3>Оформление</h3><div class="tgl-row"><span>Тёмная тема</span><div class="tgl" id="s-dark"></div></div></div>'
    +'<div class="s-card"><h3>Bluetooth-клавиатура и мышь</h3>'
    +'<div class="tgl-row"><span>Приём ввода с телефона</span><div class="tgl" id="s-bt"></div></div>'
-   +'<div style="font-size:11.5px;color:var(--muted);margin-top:8px">Сопряги телефон с планшетом в настройках Android, поставь на телефон приложение Hikari Remote, включи этот переключатель и подключись.</div></div>'
+   +'<div style="font-size:11.5px;color:var(--muted);margin-top:8px">Телефон и планшет должны быть в одной Wi-Fi сети. Установи на телефон приложение Hikari Remote — при включённом приёме оно найдёт планшет само. Bluetooth работает как запасной вариант.</div>'
+   +'<div style="font-size:11.5px;color:var(--muted);margin-top:4px">IP планшета для ручного подключения: <b id="s-ip">—</b></div></div>'
    +'<div class="s-card"><h3>О системе</h3>'
-   +'<div class="kv"><span>ОС</span>HikariOS 3.0 (WebView Edition)</div>'
+   +'<div class="kv"><span>ОС</span>HikariOS 3.1 (WebView Edition)</div>'
    +'<div class="kv"><span>Устройство</span>ZIK W1027</div>'
    +'<div class="kv"><span>Пользователь</span>zik</div>'
    +'<div class="kv"><span>Движок</span>Chromium WebView</div>'
@@ -1406,6 +1407,13 @@ function renderSettings(root){
     d.onclick=function(){ settings.accent=i; saveSettings(); renderSettings(root); };
     ac.appendChild(d);
   });
+  var ipEl = root.querySelector('#s-ip');
+  try {
+    if (ipEl){
+      if (window.zikBridge && zikBridge.localIp){ var lip = zikBridge.localIp(); ipEl.textContent = lip || 'включи Wi-Fi'; }
+      else ipEl.textContent = 'работает на планшете';
+    }
+  } catch(e){}
   var bt2 = root.querySelector('#s-bt');
   bt2.classList.toggle('on', settings.btIn===true);
   bt2.onclick=function(){
@@ -2064,14 +2072,19 @@ function initDeskCtx(){
   document.addEventListener('pointerdown', function(e){ if (!e.target.closest('#desk-ctx')) menu.style.display='none'; }, true);
 }
 initDeskCtx();
+function rmPeekTb(tb){
+  clearTimeout(tb._pk);
+  tb._pk = setTimeout(function(){ tb.classList.remove('peek'); }, 2600);
+}
 document.addEventListener('pointermove', function(e){
   if (!document.body.classList.contains('fs-hide')) return;
   var tb = document.getElementById('taskbar');
-  if (e.clientY > window.innerHeight - 16){
-    tb.classList.add('peek');
-    clearTimeout(tb._pk);
-    tb._pk = setTimeout(function(){ tb.classList.remove('peek'); }, 1600);
-  }
+  if (e.clientY > window.innerHeight - 24){ tb.classList.add('peek'); rmPeekTb(tb); }
+});
+document.addEventListener('pointerdown', function(e){
+  if (!document.body.classList.contains('fs-hide')) return;
+  var tb = document.getElementById('taskbar');
+  if (e.clientY > window.innerHeight - 14){ tb.classList.add('peek'); rmPeekTb(tb); }
 });
 
 // ---------- загрузка ----------
