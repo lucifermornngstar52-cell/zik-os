@@ -624,6 +624,7 @@ function renderMenu(){
     var t=document.createElement('div'); t.className='tile';
     t.innerHTML='<div class="ic">'+icon+'</div>'+name;
     t.addEventListener('click', function(){ if (t._suppress){ t._suppress=false; return; } fn(); });
+    t.addEventListener('contextmenu', function(e){ e.preventDefault(); t._suppress=true; tileCtx(e.clientX, e.clientY, key); });
     t.addEventListener('pointerdown', function(e){
       var hold=setTimeout(function(){ t._suppress=true; tileCtx(e.clientX, e.clientY, key); }, 450);
       t.addEventListener('pointerup', function(){ clearTimeout(hold); }, {once:true});
