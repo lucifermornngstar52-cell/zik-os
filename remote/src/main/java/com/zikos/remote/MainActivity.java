@@ -68,11 +68,13 @@ public class MainActivity extends Activity {
         sc.addView(root, new ViewGroup.LayoutParams(-1, -2));
         setContentView(sc);
 
-        root.addView(mkTxt("Hikari Remote", Color.WHITE, 30)).getTypeface();
-        TextView t0 = (TextView) root.getChildAt(root.getChildCount() - 1);
+        TextView t0 = mkTxt("Hikari Remote", Color.WHITE, 30);
         t0.setTypeface(Typeface.DEFAULT_BOLD);
-        root.addView(mkTxt("Клавиатура и мышь для HikariOS", 0xFF8B97A6, 14));
-        ((LinearLayout.LayoutParams) root.getChildAt(root.getChildCount() - 1).getLayoutParams()).topMargin = (int) dp(4);
+        root.addView(t0);
+        TextView t1 = mkTxt("Клавиатура и мышь для HikariOS", 0xFF8B97A6, 14);
+        LinearLayout.LayoutParams l1 = new LinearLayout.LayoutParams(-1, -2);
+        l1.topMargin = (int) dp(4);
+        root.addView(t1, l1);
 
         root.addView(mkTxt("1. На планшете: Настройки → «Bluetooth-клавиатура и мышь» → включить", 0xFFB8C4D4, 13));
         ((LinearLayout.LayoutParams) root.getChildAt(root.getChildCount() - 1).getLayoutParams()).topMargin = (int) dp(26);
