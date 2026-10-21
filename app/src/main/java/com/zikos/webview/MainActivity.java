@@ -12,9 +12,40 @@ import android.os.StatFs;
 import android.net.Uri;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
+import android.util.Base64;
+import android.content.ContentValues;
+import android.provider.MediaStore;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import org.json.JSONObject;
 
 public class MainActivity extends Activity {
+
+    private String pickedContent = null;
+    private static final int PICK_FILE = 4242;
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == PICK_FILE) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                try {
+                    InputStream is = getContentResolver().openInputStream(data.getData());
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = is.read(buf)) > 0 && bos.size() < 2 * 1024 * 1024) bos.write(buf, 0, n);
+                    is.close();
+                    pickedContent = bos.toString("UTF-8");
+                } catch (Exception e) {
+                    pickedContent = "__error__";
+                }
+            } else {
+                pickedContent = "__cancel__";
+            }
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +63,40 @@ public class MainActivity extends Activity {
     }
 
     public class Bridge {
+        @JavascriptInterface
+        public void saveDownload(String name, String mime, String b64) {
+            try {
+                byte[] data = Base64.decode(b64, Base64.DEFAULT);
+                ContentValues cv = new ContentValues();
+                cv.put(MediaStore.Downloads.DISPLAY_NAME, name);
+                cv.put(MediaStore.Downloads.MIME_TYPE, mime);
+                cv.put(MediaStore.Downloads.IS_PENDING, 1);
+                android.net.Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+                OutputStream os = getContentResolver().openOutputStream(uri);
+                os.write(data);
+                os.close();
+                cv.clear();
+                cv.put(MediaStore.Downloads.IS_PENDING, 0);
+                getContentResolver().update(uri, cv, null, null);
+            } catch (Exception e) {
+            }
+        }
+
+        @JavascriptInterface
+        public String importFile() {
+            pickedContent = null;
+            Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            i.addCategory(Intent.CATEGORY_OPENABLE);
+            i.setType("*/*");
+            startActivityForResult(Intent.createChooser(i, "Выберите файл"), PICK_FILE);
+            return "ok";
+        }
+
+        @JavascriptInterface
+        public String getPicked() {
+            return pickedContent;
+        }
+
         @JavascriptInterface
         public String sysinfo() {
             try {

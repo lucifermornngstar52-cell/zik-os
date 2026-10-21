@@ -206,6 +206,9 @@ textarea.ta { width:100%; min-height:84px; background:var(--card); color:var(--t
 .br-bar { display:flex; gap:6px; padding:6px 8px; align-items:center; flex-shrink:0; }
 .br-url { flex:1; background:var(--card); border:1px solid var(--outline); border-radius:8px; color:var(--text); font-size:13px; padding:8px 10px; outline:none; min-width:0; }
 .br-frame { flex:1; border:0; background:#fff; min-height:0; }
+.e-tabs { display:flex; gap:4px; padding:4px 8px; overflow-x:auto; flex-shrink:0; border-bottom:1px solid var(--outline); }
+.e-tab { border:1px solid var(--outline); background:var(--card); color:var(--text); border-radius:7px 7px 0 0; padding:4px 12px; font-size:12px; cursor:pointer; white-space:nowrap; }
+.e-tab.on { border-bottom-color:var(--accent); color:var(--accent); background:rgba(59,130,246,.1); }
 </style>
 </head>
 <body>
@@ -734,19 +737,76 @@ function renderFiles(root){
   draw();
 }
 
-// ---------- редактор кода ----------
+// ---------- редактор кода (студия) ----------
+function projDir(p){ if(!p) return null; var i=p.lastIndexOf('/'); return i<0? '' : p.slice(0,i); }
+function inlineProj(html, dir){
+  function fp(rel){
+    if (/^https?:/i.test(rel)) return null;
+    return rel[0]==='/' ? rel.slice(1) : (dir? dir+'/'+rel : rel);
+  }
+  html = html.replace(/<link[^>]+href="([^"]+)"[^>]*>/gi, function(m, href){
+    if (!/\.css(\?|$)/i.test(href)) return m;
+    var p=fp(href); if(!p||!fs[p]||fs[p].t!=='f') return m;
+    return '<style>\n'+fs[p].c+'\n</style>';
+  });
+  html = html.replace(/<script[^>]+src="([^"]+)"[^>]*>\s*<\/script>/gi, function(m, src){
+    if (!/\.js(\?|$)/i.test(src)) return m;
+    var p=fp(src); if(!p||!fs[p]||fs[p].t!=='f') return m;
+    return '<script>\n'+fs[p].c.replace(/<\/script>/gi,'<\\/script>')+'\n<\/script>';
+  });
+  return html;
+}
+var TPL_HTML = '<!DOCTYPE html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n<title>Приложение</title>\n<link rel="stylesheet" href="style.css">\n</head>\n<body>\n<div id="app"></div>\n<script src="app.js"></script>\n</body>\n</html>';
+var TPL_CSS = 'body { margin:0; background:#0d1117; color:#e6edf3; font-family:sans-serif; }\n#app { padding:16px; }';
+var TPL_JS = '// код приложения\nvar app = document.getElementById(\'app\');\napp.textContent = \'Работает!\';';
+var GEN_BUSY = false;
+function genApp(desc){
+  if (GEN_BUSY){ toast('Генерация уже идёт'); return; }
+  groqInit(function(){
+    if (!GROQ_KEY){ toast('Ключ ИИ не найден'); return; }
+    GEN_BUSY = true; toast('Генерирую приложение...');
+    fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ_KEY},
+      body: JSON.stringify({
+        model: lsGet('zikos_grok_model')||GROQ_DEF,
+        messages: [
+          {role:'system', content:'Ты — генератор одностраничных HTML5-приложений. Пиши ПОЛНЫЙ рабочий HTML-файл: разметка, CSS и JS внутри, тёмная тема, русский интерфейс, адаптив под экран 1280x720, без внешних библиотек, без пояснений. Верни ТОЛЬКО код.'},
+          {role:'user', content: desc}
+        ],
+        temperature: 0.5
+      })
+    }).then(function(r){ return r.json(); }).then(function(j){
+      GEN_BUSY = false;
+      var txt = (j && j.choices && j.choices[0] && j.choices[0].message) ? j.choices[0].message.content : null;
+      if (!txt){ toast('Ошибка генерации'); return; }
+      txt = txt.trim().replace(/^```[a-z]*\s*/i, '').replace(/```\s*$/,'');
+      var name = 'gen-'+(Date.now()%100000);
+      fsMkdir('projects/'+name);
+      fsWrite('projects/'+name+'/index.html', txt);
+      toast('Готово: projects/'+name);
+      openApp('code', 'projects/'+name+'/index.html');
+    }).catch(function(){ GEN_BUSY=false; toast('Сеть недоступна'); });
+  });
+}
 function renderCode(root, path){
-  var st = root._codeState || (root._codeState = {path:null, lang:'txt', preview:false});
-  if (path){ st.path = norm(path); st.lang = langOf(st.path); st.preview = false; }
+  var st = root._codeState || (root._codeState = {path:null, lang:'txt', preview:false, content:''});
+  if (path){ st.path = norm(path); st.lang = langOf(st.path); st.preview = false; st._prevPath = null; }
   function langOf(p){ var e=(p||'').split('.').pop().toLowerCase(); return ['html','js','css','py','dart','json'].indexOf(e)>=0 ? e : 'txt'; }
+  var dir = projDir(st.path);
   var content;
-  if (path && st.path && fs[st.path] && fs[st.path].t==='f') content = fs[st.path].c;
-  else if (path) content = '';
+  if (st.path && fs[st.path] && fs[st.path].t==='f') content = fs[st.path].c;
   else content = st.content || '';
   st.content = content;
   root.innerHTML = '<div class="e-bar"><span class="fn"></span>'
    +'<select><option value="html">HTML</option><option value="js">JS</option><option value="css">CSS</option><option value="py">Python</option><option value="dart">Dart</option><option value="json">JSON</option><option value="txt">Текст</option></select>'
-   +'<button class="e-prev-btn">'+(st.preview?'Код':'Превью')+'</button><button class="e-save">Сохранить</button></div>'
+   +'<button class="e-new" title="Новый проект из шаблона">Проект</button>'
+   +'<button class="e-gen" title="Сгенерировать приложение по описанию">&#10024;</button>'
+   +'<button class="e-prev-btn">'+(st.preview?'Код':'Превью')+'</button>'
+   +'<button class="e-imp" title="Импортировать с планшета">&#11014;</button>'
+   +'<button class="e-exp" title="Сохранить в Загрузки планшета">&#11015;</button>'
+   +'<button class="e-save">Сохранить</button></div>'
+   +'<div class="e-tabs"></div>'
    + (st.preview ? '<iframe class="e-prev"></iframe>'
       : '<div class="ed-wrap"><div class="gutter"></div><div class="code-area"><pre class="hl"></pre><textarea spellcheck="false" autocapitalize="off" autocorrect="off"></textarea></div></div>')
    +'<div class="e-stat"></div>';
@@ -761,9 +821,102 @@ function renderCode(root, path){
   }
   function doSave(p){ fsWrite(p, content); st.content=content; st.path=p; st.lang=langOf(p); sel.value=st.lang; dirty=false; st.dirty=false; updateHead(); toast('Сохранено: '+p); }
   root.querySelector('.e-save').onclick = save;
+  var tabsEl = root.querySelector('.e-tabs');
+  function drawTabs(){
+    tabsEl.innerHTML='';
+    if (!dir) return;
+    fsList(dir).forEach(function(f){
+      if (f.dir) return;
+      var p = dir+'/'+f.name;
+      var b=document.createElement('button'); b.className='e-tab'+(p===st.path?' on':'');
+      b.textContent=f.name;
+      b.onclick=function(){ openApp('code', p); };
+      tabsEl.appendChild(b);
+    });
+    var plus=document.createElement('button'); plus.className='e-tab'; plus.textContent='+';
+    plus.title='Новый файл в папке';
+    plus.onclick=function(){
+      askText('Новый файл в '+dir, '').then(function(n){
+        if(!n||!n.trim())return;
+        var nn=n.trim(); if (nn.indexOf('.')<0) nn+='.js';
+        fsWrite(dir+'/'+nn, ''); openApp('code', dir+'/'+nn);
+      });
+    };
+    tabsEl.appendChild(plus);
+  }
+  drawTabs();
+  root.querySelector('.e-new').onclick=function(){
+    askText('Название проекта', '').then(function(n){
+      if(!n||!n.trim())return;
+      var name=n.trim().replace(/[^\wа-яёА-ЯЁ -]/g,'_');
+      var d='projects/'+name, k=2;
+      while (fs[d] && fs[d].t==='d') d='projects/'+name+'-'+(k++);
+      fsMkdir(d);
+      fsWrite(d+'/index.html', TPL_HTML);
+      fsWrite(d+'/style.css', TPL_CSS);
+      fsWrite(d+'/app.js', TPL_JS);
+      openApp('code', d+'/index.html');
+      toast('Проект создан: '+d);
+    });
+  };
+  root.querySelector('.e-gen').onclick=function(){
+    askText('Опиши приложение — сгенерирую код', '').then(function(d){
+      if(d && d.trim()) genApp(d.trim());
+    });
+  };
+  root.querySelector('.e-exp').onclick=function(){
+    var name = st.path ? st.path.split('/').pop() : 'app.html';
+    if (window.zikBridge && zikBridge.saveDownload){
+      zikBridge.saveDownload(name, st.lang==='html'?'text/html':'text/plain', btoa(unescape(encodeURIComponent(content))));
+      toast('Сохранено в Загрузки: '+name);
+    } else {
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([content], {type:'text/html'}));
+      a.download=name; document.body.appendChild(a); a.click(); a.remove();
+    }
+  };
+  root.querySelector('.e-imp').onclick=function(){
+    if (window.zikBridge && zikBridge.importFile){
+      zikBridge.importFile();
+      toast('Выбери файл на планшете');
+      var tries=0;
+      var tm=setInterval(function(){
+        tries++;
+        var got=null;
+        try { got = zikBridge.getPicked(); } catch(e){}
+        if (got){
+          clearInterval(tm);
+          if (got==='__cancel__'){ toast('Импорт отменён'); return; }
+          if (got==='__error__'){ toast('Не удалось прочитать файл'); return; }
+          var nm = st.path ? st.path.split('/').pop() : 'imported.txt';
+          fsMkdir('imports');
+          var p = 'imports/'+nm;
+          fsWrite(p, got);
+          openApp('code', p);
+          toast('Импортировано: '+p);
+        } else if (tries>60){ clearInterval(tm); }
+      }, 500);
+    } else {
+      var fi=document.createElement('input'); fi.type='file';
+      fi.onchange=function(){
+        var f=fi.files[0]; if(!f)return;
+        var rd=new FileReader();
+        rd.onload=function(){ fsMkdir('imports'); var p='imports/'+f.name; fsWrite(p, rd.result); openApp('code', p); toast('Импортировано: '+p); };
+        rd.readAsText(f);
+      };
+      fi.click();
+    }
+  };
   root.querySelector('.e-prev-btn').onclick = function(){
-    if (!st.preview && st.lang!=='html'){ toast('Превью доступно для HTML'); return; }
-    st.preview = !st.preview; renderCode(root, null);
+    if (!st.preview && st.lang!=='html'){
+      var ip = dir ? dir+'/index.html' : null;
+      if (ip && fs[ip] && fs[ip].t==='f'){ st.preview=true; st._prevPath=ip; renderCode(root, null); return; }
+      toast('Превью доступно для HTML');
+      return;
+    }
+    st.preview = !st.preview;
+    st._prevPath = st.path;
+    renderCode(root, null);
   };
   var ta = root.querySelector('textarea');
   if (ta){
@@ -784,11 +937,11 @@ function renderCode(root, path){
     ta.focus();
   } else {
     var fr = root.querySelector('iframe.e-prev');
-    if (fr) fr.srcdoc = content;
+    var pp = st._prevPath || st.path;
+    if (fr && pp && fs[pp] && fs[pp].t==='f') fr.srcdoc = inlineProj(fs[pp].c, projDir(pp));
     updateHead();
   }
 }
-
 // ---------- конвертер ----------
 var UNITS = {
   'Длина':{'мм':0.001,'см':0.01,'м':1,'км':1000,'дюйм':0.0254,'фут':0.3048,'ярд':0.9144,'миля':1609.344},
