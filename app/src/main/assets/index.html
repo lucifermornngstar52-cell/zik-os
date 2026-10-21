@@ -527,7 +527,8 @@ function buildDeskIcons(){
   }
   APPS.forEach(function(a){ if (!a.hidden) makeIcon(a.id, a.title, a.icon, function(){ openApp(a.id); }); });
   installedApps().forEach(function(a){ makeIcon('user:'+a.path, esc(a.name), IC.apps, function(){ openApp('runapp', a.path); }); });
-}function toggleMenu(){ menuOpen=!menuOpen; if(menuOpen) renderMenu(); $('#menu').classList.toggle('hidden', !menuOpen); }
+}var menuOpen=false;
+function toggleMenu(){ menuOpen=!menuOpen; if(menuOpen) renderMenu(); $('#menu').classList.toggle('hidden', !menuOpen); }
 function renderMenu(){
   var m = $('#menu');
   m.innerHTML = '<div class="search">'+IC.search+'<input id="menu-q" placeholder="Поиск приложений"></div>'
@@ -582,7 +583,6 @@ function renderMenu(){
   m.querySelector('#mtab-mine').onclick=function(){ setTab('mine'); };
   m.querySelector('#menu-q').addEventListener('input', function(e){ draw(e.target.value.toLowerCase()); });
   m.querySelector('#pwr').addEventListener('click', function(){ $('#shutdown').classList.remove('hidden'); });
-}
 }
 function tick(){
   var d=new Date();
