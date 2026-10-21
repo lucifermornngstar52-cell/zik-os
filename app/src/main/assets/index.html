@@ -228,6 +228,9 @@ textarea.ta { width:100%; min-height:84px; background:var(--card); color:var(--t
 .e-log { white-space:pre-wrap; word-break:break-all; }
 .e-log.e-error { color:#F87171; }
 .e-log.e-warn { color:#FBBF24; }
+#grid-overlay { display:none; position:fixed; inset:0; pointer-events:none; background-image:linear-gradient(rgba(120,160,255,.09) 1px, transparent 1px), linear-gradient(90deg, rgba(120,160,255,.09) 1px, transparent 1px); background-size:94px 95px; background-position:10px 10px; }
+.dicon { transition:transform .12s, filter .12s; }
+.dicon.held { transform:scale(1.14); filter:brightness(1.3); }
 </style>
 </head>
 <body>
@@ -470,75 +473,59 @@ function buildDeskIcons(){
   try { pos = JSON.parse(lsGet('zikos_icons')) || {}; } catch(e){ pos={}; }
   var layerH = (window.innerHeight||720) - 118;
   var perCol = Math.max(1, Math.floor(layerH/95));
-  function makeIcon(key, label, iconSvg, onClick, onHold){
+  var gov = document.createElement('div'); gov.id='grid-overlay'; c.appendChild(gov);
+  var added = 0;
+  function makeIcon(key, label, iconSvg, onClick){
     var d=document.createElement('div'); d.className='dicon';
     d.innerHTML='<div class="ic">'+iconSvg+'</div><span>'+label+'</span>';
     var p=(pos[key] && typeof pos[key].x==='number') ? pos[key] : null;
-    if (!p){ var idx=c.children.length; p={x:10+Math.floor(idx/perCol)*94, y:10+(idx%perCol)*95}; }
+    if (!p){ p={x:10+Math.floor(added/perCol)*94, y:10+(added%perCol)*95}; }
+    added++;
     d.style.left=p.x+'px'; d.style.top=p.y+'px';
-    var down=null, moved=false, hold=null, held=false;
+    var down=null, held=false, hold=null;
     d.addEventListener('pointerdown', function(e){
-      down={sx:e.clientX, sy:e.clientY, lx:p.x, ly:p.y}; moved=false; held=false;
-      if (onHold) hold=setTimeout(function(){ hold=null; held=true; onHold(); }, 600);
+      down={sx:e.clientX, sy:e.clientY, lx:p.x, ly:p.y}; held=false;
+      hold=setTimeout(function(){
+        hold=null; held=true;
+        d.classList.add('held');
+        gov.style.display='block';
+      }, 400);
       try { d.setPointerCapture(e.pointerId); } catch(er){}
       e.preventDefault();
     });
     d.addEventListener('pointermove', function(e){
       if (!down) return;
-      if (Math.abs(e.clientX-down.sx)>7 || Math.abs(e.clientY-down.sy)>7){ moved=true; if(hold){clearTimeout(hold); hold=null;} }
-      if (!moved || held) return;
+      if (!held){
+        if (Math.abs(e.clientX-down.sx)>12 || Math.abs(e.clientY-down.sy)>12){
+          if (hold){ clearTimeout(hold); hold=null; }
+          down=null;
+        }
+        return;
+      }
       p.x=clampN(down.lx+(e.clientX-down.sx), 0, window.innerWidth-92);
       p.y=clampN(down.ly+(e.clientY-down.sy), 0, window.innerHeight-150);
       d.style.left=p.x+'px'; d.style.top=p.y+'px';
     });
     d.addEventListener('pointerup', function(){
       if (hold){ clearTimeout(hold); hold=null; }
-      if (down && moved){ pos[key]={x:p.x,y:p.y}; lsSet('zikos_icons', JSON.stringify(pos)); }
-      else if (down && !moved && !held){ onClick(); }
+      gov.style.display='none';
+      d.classList.remove('held');
+      if (down && held){
+        p.x=Math.max(10, Math.min(Math.round((p.x-10)/94)*94+10, window.innerWidth-92));
+        p.y=Math.max(10, Math.min(Math.round((p.y-10)/95)*95+10, window.innerHeight-150));
+        d.style.left=p.x+'px'; d.style.top=p.y+'px';
+        pos[key]={x:p.x,y:p.y};
+        lsSet('zikos_icons', JSON.stringify(pos));
+      } else if (down && !held){
+        onClick();
+      }
       down=null;
     });
     c.appendChild(d);
   }
-  APPS.forEach(function(a){ if (!a.hidden) makeIcon(a.id, a.title, a.icon, function(){ openApp(a.id); }, null); });
-  installedApps().forEach(function(a){
-    makeIcon('user:'+a.path, esc(a.name), IC.apps, function(){ openApp('runapp', a.path); },
-      function(){ confirmDlg('Удалить ярлык «'+a.name+'»?').then(function(ok){ if(ok){ uninstallApp(a.path); toast('Ярлык удалён'); } }); });
-  });
-}var menuOpen=false;
-function toggleMenu(){ menuOpen=!menuOpen; if(menuOpen) renderMenu(); $('#menu').classList.toggle('hidden', !menuOpen); }
-function renderMenu(){
-  var m = $('#menu');
-  m.innerHTML = '<div class="search">'+IC.search+'<input id="menu-q" placeholder="Поиск приложений"></div>'
-   +'<div class="label">Закреплено</div><div class="grid" id="menu-grid"></div>'
-   +'<footer><div class="ava">z</div><div class="who">zik<small>zik@zikos · HikariOS 2.0</small></div>'
-   +'<button class="tb-btn" id="pwr" title="Выключение">'+IC.power+'</button></footer>';
-  var grid = m.querySelector('#menu-grid');
-  function draw(q){
-    grid.innerHTML='';
-    var found=0;
-    installedApps().forEach(function(a){
-      if (q && a.name.toLowerCase().indexOf(q)<0) return;
-      var t2=document.createElement('div'); t2.className='tile';
-      t2.innerHTML='<div class="ic">'+IC.apps+'</div>'+esc(a.name);
-      t2.addEventListener('click', function(){ openApp('runapp', a.path); toggleMenu(); });
-      grid.appendChild(t2);
-    });
-    for (var i=0;i<APPS.length;i++)(function(a){
-      if (a.hidden) return;
-      if (a.title.toLowerCase().indexOf(q)<0) return;
-      found++;
-      var t=document.createElement('div'); t.className='tile';
-      t.innerHTML='<div class="ic">'+a.icon+'</div>'+a.title;
-      t.addEventListener('click', function(){ openApp(a.id); toggleMenu(); });
-      grid.appendChild(t);
-    })(APPS[i]);
-    if(!found) grid.innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--muted);padding:30px 0">Ничего не найдено</div>';
-  }
-  draw('');
-  m.querySelector('#menu-q').addEventListener('input', function(e){ draw(e.target.value.toLowerCase()); });
-  m.querySelector('#pwr').addEventListener('click', function(){ $('#shutdown').classList.remove('hidden'); });
-}
-function tick(){
+  APPS.forEach(function(a){ if (!a.hidden) makeIcon(a.id, a.title, a.icon, function(){ openApp(a.id); }); });
+  installedApps().forEach(function(a){ makeIcon('user:'+a.path, esc(a.name), IC.apps, function(){ openApp('runapp', a.path); }); });
+}function tick(){
   var d=new Date();
   var wd=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'][ (d.getDay()+6)%7 ];
   function p2(n){ return (n<10?'0':'')+n; }
