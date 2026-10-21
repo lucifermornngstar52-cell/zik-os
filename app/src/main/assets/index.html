@@ -431,6 +431,7 @@ function openApp(id, arg){
   if (id==='runapp'){
     el.classList.add('run-full');
     var tbr = el.querySelector('.tbar'); if (tbr) tbr.remove();
+    var rs = el.querySelector('.rsz'); if (rs) rs.remove();
     var xb = document.createElement('button'); xb.className='rf-close'; xb.title='Закрыть';
     xb.innerHTML = IC.close;
     xb.addEventListener('click', function(){ closeWin(id); });
